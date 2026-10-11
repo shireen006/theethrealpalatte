@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
+  <rect width="192" height="192" rx="48" fill="#faf5f1"/>
+  <circle cx="96" cy="96" r="78" fill="#f7e5e3" stroke="#d99b98" stroke-width="4"/>
+  
+  <!-- Sage green yarn ball -->
+  <g transform="translate(68, 76)">
+    <circle cx="0" cy="0" r="32" fill="#88A878" stroke="#5C7A4E" stroke-width="3"/>
+    <path d="M -20 -13 Q 0 -24 20 -13" stroke="#4B683E" stroke-width="2.5" fill="none"/>
+    <path d="M -24 2 Q 0 -6 24 2" stroke="#4B683E" stroke-width="2.5" fill="none"/>
+    <path d="M -18 16 Q 0 8 18 16" stroke="#4B683E" stroke-width="2.5" fill="none"/>
+  </g>
+
+  <!-- Cute Cat Peeking -->
+  <g transform="translate(120, 116)">
+    <path d="M -22 -13 Q -28 -32 -11 -25 Z" fill="#FFFFFF" stroke="#222222" stroke-width="2.4"/>
+    <path d="M 22 -13 Q 28 -32 11 -25 Z" fill="#FFFFFF" stroke="#222222" stroke-width="2.4"/>
+    <ellipse cx="0" cy="0" rx="24" ry="19" fill="#FFFFFF" stroke="#222222" stroke-width="2.4"/>
+    <circle cx="-10" cy="-2" r="2.8" fill="#222222"/>
+    <circle cx="10" cy="-2" r="2.8" fill="#222222"/>
+    <ellipse cx="-15" cy="3" rx="4" ry="2.5" fill="#FFAAA6" opacity="0.8"/>
+    <ellipse cx="15" cy="3" rx="4" ry="2.5" fill="#FFAAA6" opacity="0.8"/>
+    <path d="M -4 3 Q -2 5 0 3 Q 2 5 4 3" stroke="#222222" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+  </g>
+</svg>

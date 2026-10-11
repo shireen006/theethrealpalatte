@@ -39,6 +39,9 @@ a {
   text-decoration: none;
 }
 
+/* =========================================================
+   ANNOUNCEMENT BAR (IMAGE 1)
+   ========================================================= */
 .announcement {
   min-height: 32px;
   padding: 7px 16px;
@@ -49,52 +52,65 @@ a {
   gap: 11px;
   font-size: 12px;
   letter-spacing: .03em;
+  color: #4A352F;
 }
 
+/* =========================================================
+   HEADER & NAVBAR (IMAGES 1, 2, 4)
+   ========================================================= */
 .header {
   height: 76px;
   padding: 0 5.5%;
   border-bottom: 1px solid var(--line);
-  background: rgba(255, 253, 251, .97);
+  background: rgba(255, 253, 251, .98);
   display: flex;
   align-items: center;
-  gap: 50px;
+  justify-content: space-between;
   position: sticky;
   top: 0;
-  z-index: 20;
+  z-index: 50;
+  backdrop-filter: blur(8px);
 }
 
 .logo {
   font: 500 30px/1 "Cormorant Garamond", serif;
   white-space: nowrap;
   letter-spacing: -.02em;
+  color: var(--espresso);
+  display: flex;
+  align-items: center;
 }
 
-.logo-mark {
-  color: var(--blush-strong);
-  margin-left: 4px;
+.logo-emoji {
+  margin-left: 6px;
+  font-size: 24px;
 }
 
 .nav {
   display: flex;
   align-items: center;
   gap: 34px;
-  margin-left: auto;
 }
 
-.nav>a,
-.shop-nav>button {
+.nav > a,
+.shop-nav > button {
   border: 0;
   background: transparent;
   color: var(--espresso);
   font-size: 14px;
+  transition: color 0.2s ease;
+}
+
+.nav > a:hover,
+.shop-nav > button:hover {
+  color: var(--blush-strong);
 }
 
 .shop-nav {
   position: relative;
 }
 
-.shop-nav>button {
+.shop-nav > button {
   display: flex;
   align-items: center;
   gap: 5px;
@@ -114,12 +130,15 @@ a {
   background: var(--white);
   border: 1px solid var(--line);
   box-shadow: 0 14px 35px rgba(48, 37, 31, .09);
+  border-radius: 4px;
+  z-index: 100;
 }
 
 .shop-menu a {
   display: block;
   padding: 10px;
   font-size: 14px;
+  transition: background 0.15s ease;
 }
 
 .shop-menu a:hover {
@@ -129,15 +148,23 @@ a {
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 17px;
+  gap: 16px;
 }
 
-.header-actions button,
-.mobile-icon {
+.header-actions .action-btn {
   border: 0;
   background: transparent;
-  padding: 4px;
+  padding: 6px;
   color: var(--espresso);
+  display: grid;
+  place-items: center;
+  position: relative;
+  border-radius: 50%;
+  transition: background 0.2s ease;
+}
+
+.header-actions .action-btn:hover {
+  background: var(--soft-cream);
 }
 
 .header-actions svg {
@@ -146,38 +173,107 @@ a {
   stroke-width: 1.5;
 }
 
-.cart {
-  position: relative;
-}
-
-.cart span {
+.wishlist-btn .badge {
   position: absolute;
-  right: -7px;
-  top: -8px;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
+  top: -2px;
+  right: -2px;
   background: var(--blush-strong);
   color: white;
-  font-size: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
+
+.cart-btn .cart-badge {
+  position: absolute;
+  top: -2px;
+  right: -4px;
+  background: #E04848;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
   display: grid;
   place-items: center;
 }
 
 .mobile-icon {
   display: none;
+  background: transparent;
+  border: 0;
+  padding: 4px;
+  color: var(--espresso);
 }
 
+/* =========================================================
+   SEARCH BAR
+   ========================================================= */
+.search-box-wrap {
+  width: 100%;
+  padding: 14px 6%;
+  background: var(--soft-cream);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  animation: trp-fade-in 0.2s ease;
+}
+
+.search-box-wrap input {
+  width: 100%;
+  max-width: 500px;
+  padding: 10px 20px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: #ffffff;
+  font: inherit;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.search-box-wrap input:focus {
+  border-color: var(--blush-strong);
+}
+
+.search-close-btn {
+  background: transparent;
+  border: 0;
+  font-size: 16px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+/* =========================================================
+   HERO CAROUSEL & CAT ANIMATION (IMAGE 1 & 3)
+   ========================================================= */
 .hero {
+  position: relative;
   height: 620px;
   min-height: 620px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: var(--cream);
+  overflow: hidden;
 }
 
 .hero-copy {
   position: relative;
   z-index: 2;
   align-self: center;
-  padding: 55px 8% 55px 14%;
+  /* Dedicated left clearance guaranteeing zero collision with cat & yarn */
+  padding: 55px 8% 55px clamp(135px, 12vw, 175px);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .eyebrow {
@@ -187,17 +283,13 @@ a {
   letter-spacing: .28em;
   font-size: 11px;
   font-weight: 500;
-}
-
-.eyebrow span {
-  width: 38px;
-  height: 1px;
-  background: var(--blush-strong);
+  color: var(--espresso);
 }
 
 .hero h1 {
   margin: 12px 0 0;
-  font: italic 600 clamp(58px, 6vw, 86px)/.88 "Cormorant Garamond", serif;
+  font: italic 600 clamp(54px, 5.5vw, 84px)/.88 "Cormorant Garamond", serif;
+  color: var(--espresso);
 }
 
 .title-line {
@@ -211,6 +303,7 @@ a {
   max-width: 240px;
   margin: 0 0 25px;
   font: 20px/1.25 "Cormorant Garamond", serif;
+  color: var(--espresso);
 }
 
 .primary-btn {
@@ -222,6 +315,9 @@ a {
   border: 1px solid rgba(48, 37, 31, .08);
   font: 500 14px "Cormorant Garamond", serif;
   transition: transform .2s ease, background .2s ease;
+  width: fit-content;
+  color: var(--espresso);
+  border-radius: 2px;
 }
 
 .primary-btn:hover {
@@ -232,6 +328,7 @@ a {
 
 .hero-image-wrap {
   position: relative;
+  height: 100%;
   min-height: 520px;
 }
 
@@ -245,22 +342,29 @@ a {
 .hero-soft-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, rgba(250, 245, 241, .16), transparent 30%);
+  background: linear-gradient(90deg, rgba(255, 253, 251, .2), transparent 30%);
   pointer-events: none;
 }
 
 .hero-arrow {
   position: absolute;
-  z-index: 3;
+  z-index: 10;
   top: 50%;
   transform: translateY(-50%);
-  width: 40px;
-  height: 40px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, .9);
+  background: rgba(255, 255, 255, .92);
   display: grid;
   place-items: center;
+  transition: all 0.2s ease;
+  color: var(--espresso);
+}
+
+.hero-arrow:hover {
+  background: #ffffff;
+  transform: translateY(-50%) scale(1.08);
 }
 
 .hero-arrow.left {
@@ -273,12 +377,12 @@ a {
 
 .dots {
   position: absolute;
-  z-index: 4;
-  bottom: 15px;
+  z-index: 10;
+  bottom: 18px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
-  gap: 7px;
+  gap: 8px;
 }
 
 .dot {
@@ -288,29 +392,292 @@ a {
   border: 0;
   background: #d8cbc6;
   padding: 0;
+  transition: background 0.2s ease;
 }
 
 .dot.active {
   background: var(--espresso);
+  width: 20px;
+  border-radius: 4px;
 }
 
-.collections,
+/* =========================================================
+   EXACT 6-STAGE HERO CAT & YARN ANIMATION (IMAGE 1)
+   Positioned strictly in dedicated left corridor
+   ========================================================= */
+.hero-cat-wrapper {
+  position: absolute;
+  left: clamp(14px, 2.5vw, 32px);
+  bottom: 0px;
+  width: clamp(95px, 8vw, 120px);
+  height: clamp(210px, 19vw, 260px);
+  z-index: 10;
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.hero-cat-wrapper:hover {
+  transform: scale(1.04);
+}
+
+.hero-cat-svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  display: block;
+}
+
+/* PWA INSTALL BUTTONS */
+.pwa-header-install {
+  background: var(--blush-pale);
+  color: var(--espresso);
+  border: 1px solid var(--blush);
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.pwa-header-install:hover {
+  background: var(--blush-strong);
+  color: #ffffff;
+  border-color: var(--blush-strong);
+}
+
+.account-install-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 16px;
+  background: var(--blush-pale);
+  border: 1px solid var(--blush-strong);
+  border-radius: 4px;
+  margin-top: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--espresso);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.account-install-btn:hover {
+  background: var(--blush-strong);
+  color: #ffffff;
+}
+
+/* =========================================================
+   PRODUCT DETAIL PAGE (EXACTLY MATCHING IMAGE 2)
+   ========================================================= */
+.product-detail {
+  padding: 40px 6% 80px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.product-detail-back {
+  background: transparent;
+  border: 0;
+  font-size: 26px;
+  font-weight: 300;
+  color: var(--espresso);
+  cursor: pointer;
+  margin-bottom: 24px;
+  padding: 0;
+  line-height: 1;
+  display: inline-block;
+  transition: transform 0.2s ease;
+}
+
+.product-detail-back:hover {
+  transform: translateX(-4px);
+}
+
+.product-detail-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 50px;
+  align-items: start;
+}
+
+.product-detail-image {
+  position: relative;
+  background: var(--soft-cream);
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+}
+
+.product-detail-image img {
+  width: 100%;
+  height: 480px;
+  object-fit: cover;
+  display: block;
+}
+
+.detail-image-wishlist {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--line);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  color: var(--espresso);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: all 0.2s ease;
+}
+
+.detail-image-wishlist:hover {
+  transform: scale(1.08);
+}
+
+.product-detail-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.product-detail-info .eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+.product-detail-info h1 {
+  font: 600 36px/1.2 "Cormorant Garamond", serif;
+  margin: 0 0 12px;
+  color: var(--espresso);
+}
+
+.product-detail-price {
+  font-size: 24px;
+  font-weight: 500;
+  color: var(--espresso);
+  margin: 0 0 20px;
+}
+
+.product-detail-description {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--muted);
+  margin: 0 0 24px;
+  white-space: pre-line;
+}
+
+.product-quantity {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #dcd3ce;
+  border-radius: 3px;
+  margin-bottom: 24px;
+  width: fit-content;
+  background: #ffffff;
+}
+
+.product-quantity button {
+  background: transparent;
+  border: 0;
+  padding: 8px 18px;
+  font-size: 18px;
+  cursor: pointer;
+  color: var(--espresso);
+  line-height: 1;
+}
+
+.product-quantity span {
+  padding: 0 14px;
+  font-size: 15px;
+  font-weight: 500;
+  min-width: 32px;
+  text-align: center;
+}
+
+.product-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.detail-add-cart {
+  background: #000000;
+  color: #ffffff;
+  border: 0;
+  border-radius: 3px;
+  padding: 14px 28px;
+  font-size: 14px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  width: 100%;
+  letter-spacing: 0.02em;
+}
+
+.detail-add-cart:hover {
+  background: #262626;
+}
+
+.detail-whatsapp-btn {
+  background: #ffffff;
+  color: #1a1a1a;
+  border: 1px solid #1a1a1a;
+  border-radius: 3px;
+  padding: 14px 28px;
+  font-size: 14px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+  letter-spacing: 0.02em;
+}
+
+.detail-whatsapp-btn:hover {
+  background: #f7f5f3;
+}
+
+/* =========================================================
+   PRODUCTS CATALOGUE SECTION (IMAGE 4)
+   ========================================================= */
 .products-section {
-  padding: 58px 5.5%;
+  background: #fff;
+  padding: 60px 5.5% 80px;
 }
 
 .section-heading {
   text-align: center;
   position: relative;
+  margin-bottom: 24px;
 }
 
 .section-heading h2 {
   display: inline-block;
   margin: 0 14px;
   font: 600 39px/1 "Cormorant Garamond", serif;
+  color: var(--espresso);
 }
 
-.section-heading>span {
+.section-heading > span {
   display: inline-block;
   width: 50px;
   height: 1px;
@@ -325,93 +692,43 @@ a {
   color: var(--muted);
 }
 
-.collection-grid {
-  margin-top: 28px;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 18px;
-}
-
-.collection-grid button {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  position: relative;
-  overflow: hidden;
-  aspect-ratio: 1.6;
-}
-
-.collection-grid img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-  transition: transform .5s ease;
-}
-
-.collection-grid button:hover img {
-  transform: scale(1.03);
-}
-
-.collection-grid button::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(transparent 45%, rgba(30, 20, 15, .46));
-}
-
-.collection-grid div {
-  position: absolute;
-  z-index: 2;
-  left: 28px;
-  bottom: 24px;
-  color: white;
-  text-align: left;
-}
-
-.collection-grid strong {
-  display: block;
-  font: 500 31px "Cormorant Garamond", serif;
-}
-
-.collection-grid small {
-  letter-spacing: .16em;
-  font-size: 9px;
-}
-
-.products-section {
-  background: #fff;
-  padding-top: 40px;
-}
-
 .filters {
   display: flex;
   justify-content: center;
-  gap: 9px;
-  margin: 24px 0 30px;
+  gap: 10px;
+  margin: 24px 0 34px;
 }
 
 .filters button {
   border: 1px solid var(--line);
   border-radius: 999px;
   background: white;
-  padding: 8px 20px;
-  font-size: 12px;
+  padding: 8px 22px;
+  font-size: 13px;
+  color: var(--espresso);
+  transition: all 0.2s ease;
+}
+
+.filters button:hover {
+  border-color: var(--blush-strong);
 }
 
 .filters button.selected {
   background: var(--blush-pale);
   border-color: var(--blush);
+  font-weight: 500;
 }
 
 .product-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 24px 18px;
+  gap: 28px 20px;
 }
 
 .product-card {
   min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .product-image {
@@ -419,6 +736,7 @@ a {
   aspect-ratio: 1 / 1.08;
   overflow: hidden;
   background: var(--soft-cream);
+  border-radius: 3px;
 }
 
 .product-image img {
@@ -430,7 +748,7 @@ a {
 }
 
 .product-card:hover .product-image img {
-  transform: scale(1.025);
+  transform: scale(1.03);
 }
 
 .wishlist {
@@ -444,10 +762,17 @@ a {
   background: rgba(255, 255, 255, .92);
   display: grid;
   place-items: center;
+  cursor: pointer;
+  z-index: 2;
+  transition: transform 0.2s ease;
+}
+
+.wishlist:hover {
+  transform: scale(1.1);
 }
 
 .product-info {
-  padding: 10px 2px;
+  padding: 12px 2px 4px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -456,810 +781,195 @@ a {
 
 .product-info h3 {
   margin: 0 0 3px;
-  font: 500 18px "Cormorant Garamond", serif;
+  font: 500 17px "Cormorant Garamond", serif;
+  color: var(--espresso);
+  transition: color 0.2s ease;
+}
+
+.product-info h3:hover {
+  color: var(--blush-strong);
 }
 
 .product-info p {
   margin: 0;
-  font-size: 13px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--espresso);
+}
+
+.card-quick-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .add-cart {
   border: 0;
   background: var(--blush-pale);
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   display: grid;
   place-items: center;
+  color: var(--espresso);
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
+.add-cart:hover {
+  background: var(--blush-strong);
+  color: white;
+  transform: scale(1.08);
+}
+
+.card-whatsapp-quick {
+  border: 0;
+  background: #25D366;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.card-whatsapp-quick:hover {
+  transform: scale(1.08);
+  background: #20b858;
+}
+
+/* =========================================================
+   ABOUT SECTION
+   ========================================================= */
 .about {
   padding: 95px 20px;
   text-align: center;
   background: var(--soft-cream);
 }
 
-.about h2 {
-  margin: 12px 0 8px;
-  font: italic 600 44px "Cormorant Garamond", serif;
-}
-
-.about>p:last-child {
-  margin: 0;
-  color: var(--muted);
-}
-
-footer {
-  padding: 50px 7%;
-  border-top: 1px solid var(--line);
-  text-align: center;
-}
-
-.footer-logo {
-  font: 500 30px "Cormorant Garamond", serif;
-}
-
-footer p {
-  color: var(--muted);
-  font-size: 13px;
-}
-
-.footer-links {
-  display: flex;
-  justify-content: center;
-  gap: 24px;
-  font-size: 13px;
-}
-
-@media (max-width: 850px) {
-  .announcement {
-    font-size: 10px;
-    gap: 7px;
-    white-space: nowrap;
-    overflow: hidden;
-  }
-
-  .header {
-    height: 64px;
-    padding: 0 17px;
-    justify-content: space-between;
-    gap: 8px;
-  }
-
-  .mobile-icon {
-    display: block;
-  }
-
-  .mobile-icon svg {
-    width: 21px;
-  }
-
-  .logo {
-    font-size: 25px;
-  }
-
-  .nav {
-    display: none;
-    position: absolute;
-    top: 64px;
-    left: 0;
-    right: 0;
-    background: white;
-    border-bottom: 1px solid var(--line);
-    padding: 14px 20px;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0;
-  }
-
-  .nav.nav-open {
-    display: flex;
-  }
-
-  .nav>a,
-  .shop-nav>button {
-    padding: 13px 4px;
-    text-align: left;
-  }
-
-  .shop-menu {
-    position: static;
-    width: auto;
-    box-shadow: none;
-    border: 0;
-    padding: 0 0 7px 13px;
-  }
-
-  .header-actions {
-    gap: 8px;
-  }
-
-  .header-actions .account {
-    display: none;
-  }
-
-  .header-actions svg {
-    width: 18px;
-  }
-
-  .hero {
-    min-height: 570px;
-    display: flex;
-    flex-direction: column-reverse;
-  }
-
-  .hero-image {
-    height: 620px;
-    overflow: hidden;
-  }
-
-  .hero-copy {
-    padding: 29px 28px 48px;
-  }
-
-  .hero h1 {
-    font-size: 58px;
-  }
-
-  .hero-copy p {
-    font-size: 18px;
-    margin-bottom: 16px;
-  }
-
-  .hero-arrow {
-    width: 34px;
-    height: 34px;
-  }
-
-  .hero-arrow.left {
-    left: 12px;
-    top: 27%;
-  }
-
-  .hero-arrow.right {
-    right: 12px;
-    top: 27%;
-  }
-
-  .dots {
-    bottom: 13px;
-  }
-
-  .desktop-only {
-    display: none;
-  }
-
-  .products-section {
-    padding: 42px 14px 60px;
-  }
-
-  .section-heading h2 {
-    font-size: 32px;
-  }
-
-  .section-heading>span {
-    width: 27px;
-  }
-
-  .section-heading p {
-    font-size: 8px;
-  }
-
-  .filters {
-    margin: 20px 0 24px;
-  }
-
-  .filters button {
-    padding: 7px 16px;
-  }
-
-  .product-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 22px 10px;
-  }
-
-  .product-info h3 {
-    font-size: 16px;
-  }
-
-  .product-info p {
-    font-size: 12px;
-  }
-
-  .about {
-    padding: 65px 20px;
-  }
-
-  .about h2 {
-    font-size: 37px;
-  }
-}
-
-@media (max-width: 450px) {
-  .logo {
-    font-size: 22px;
-  }
-
-  .header-actions {
-    gap: 4px;
-  }
-
-  .header-actions button {
-    padding: 3px;
-  }
-
-  .hero-image-wrap {
-    height: 74vw;
-    min-height: 270px;
-  }
-
-  .hero {
-    min-height: 0;
-  }
-
-  .hero-copy {
-    padding: 28px 23px 48px;
-  }
-
-  .hero h1 {
-    font-size: 51px;
-  }
-
-  .hero-copy p {
-    max-width: 210px;
-  }
-
-  .primary-btn {
-    padding: 11px 19px;
-  }
-
-  .product-grid {
-    gap: 20px 9px;
-  }
-
-  .wishlist {
-    width: 29px;
-    height: 29px;
-  }
-
-  .wishlist svg {
-    width: 16px;
-  }
-}
-
-
-/* =========================================================
-   THEETHREALPALATTE — TINY CROCHET CAT EASTER EGG
-   Added only; existing website CSS remains unchanged.
-   ========================================================= */
-
-.trp-cat-scene {
-  position: fixed;
-  inset: 0;
-  width: 100vw;
-  height: 100vh;
-  pointer-events: none;
-  z-index: 9999;
-  overflow: hidden;
-}
-
-.trp-yarn-fall {
-  position: absolute;
-  top: -55px;
-  left: 16px;
-  width: 34px;
-  height: 34px;
-  animation: trp-yarn-drop 5.2s cubic-bezier(.2, .75, .25, 1) forwards;
-}
-
-.trp-yarn-ball {
-  position: absolute;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background: #a9bd9e;
-  box-shadow: inset -5px -4px 0 rgba(75, 93, 70, .12), inset 4px 4px 0 rgba(255, 255, 255, .18);
-}
-
-.trp-yarn-ball span {
-  position: absolute;
-  width: 23px;
-  height: 9px;
-  border-bottom: 2px solid rgba(91, 112, 82, .42);
-  border-radius: 50%;
-  left: 3px;
-}
-
-.trp-yarn-ball span:nth-child(1) {
-  top: 7px;
-  transform: rotate(18deg);
-}
-
-.trp-yarn-ball span:nth-child(2) {
-  top: 12px;
-  transform: rotate(-15deg);
-}
-
-.trp-yarn-ball span:nth-child(3) {
-  top: 17px;
-  transform: rotate(13deg);
-}
-
-.trp-yarn-string {
-  position: absolute;
-  width: 42px;
-  height: 2px;
-  background: #91a786;
-  top: 27px;
-  left: 19px;
-  transform: rotate(18deg);
-  transform-origin: left center;
-}
-
-@keyframes trp-yarn-drop {
-  0% {
-    transform: translateY(0) rotate(0deg);
-  }
-
-  68% {
-    transform: translateY(calc(100vh - 120px)) rotate(360deg);
-  }
-
-  76% {
-    transform: translateY(calc(100vh - 139px)) rotate(390deg);
-  }
-
-  84% {
-    transform: translateY(calc(100vh - 120px)) rotate(420deg);
-  }
-
-  100% {
-    transform: translateY(calc(100vh - 120px)) rotate(450deg);
-    opacity: 0;
-  }
-}
-
-.trp-cat {
-  position: absolute;
-  left: 12px;
-  bottom: 12px;
-  width: 92px;
-  height: auto;
-  overflow: visible;
-  transform-origin: 50% 100%;
-  animation: trp-cat-react 5.2s ease-in-out forwards;
-}
-
-@keyframes trp-cat-react {
-
-  0%,
-  58% {
-    transform: translateY(0) rotate(0deg);
-  }
-
-  63% {
-    transform: translateY(1px) rotate(-4deg);
-  }
-
-  67% {
-    transform: translateY(0) rotate(4deg);
-  }
-
-  71% {
-    transform: translateY(0) rotate(-2deg);
-  }
-
-  76%,
-  100% {
-    transform: translateY(0) rotate(0deg);
-  }
-}
-
-.trp-cat-head {
-  transform-origin: 92px 75px;
-  animation: trp-cat-look 5.2s ease-in-out forwards;
-}
-
-@keyframes trp-cat-look {
-
-  0%,
-  65% {
-    transform: rotate(0deg);
-  }
-
-  70% {
-    transform: rotate(-8deg);
-  }
-
-  76% {
-    transform: rotate(4deg);
-  }
-
-  82%,
-  100% {
-    transform: rotate(0deg);
-  }
-}
-
-.trp-cat-paw-left {
-  transform-origin: 69px 108px;
-  animation: trp-paw-left 5.2s ease-in-out forwards;
-}
-
-.trp-cat-paw-right {
-  transform-origin: 108px 108px;
-  animation: trp-paw-right 5.2s ease-in-out forwards;
-}
-
-@keyframes trp-paw-left {
-
-  0%,
-  72% {
-    transform: translate(0, 0) rotate(0deg);
-  }
-
-  78% {
-    transform: translate(8px, -8px) rotate(-18deg);
-  }
-
-  84% {
-    transform: translate(15px, -2px) rotate(-8deg);
-  }
-
-  100% {
-    transform: translate(12px, 0) rotate(-4deg);
-  }
-}
-
-@keyframes trp-paw-right {
-
-  0%,
-  74% {
-    transform: translate(0, 0) rotate(0deg);
-  }
-
-  80% {
-    transform: translate(-7px, -7px) rotate(18deg);
-  }
-
-  86% {
-    transform: translate(-12px, -1px) rotate(8deg);
-  }
-
-  100% {
-    transform: translate(-10px, 0) rotate(4deg);
-  }
-}
-
-.trp-mini-yarn {
-  opacity: 0;
-  animation: trp-mini-yarn-show 5.2s ease-in-out forwards;
-}
-
-@keyframes trp-mini-yarn-show {
-
-  0%,
-  81% {
-    opacity: 0;
-    transform: scale(.5);
-  }
-
-  86% {
-    opacity: 1;
-    transform: scale(1.05);
-  }
-
-  90%,
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-.trp-hook {
-  opacity: 0;
-  transform-origin: 91px 118px;
-  animation: trp-hook-start 5.2s ease-in-out forwards;
-}
-
-@keyframes trp-hook-start {
-
-  0%,
-  87% {
-    opacity: 0;
-    transform: rotate(0deg);
-  }
-
-  90% {
-    opacity: 1;
-    transform: rotate(-12deg);
-  }
-
-  93% {
-    opacity: 1;
-    transform: rotate(15deg);
-  }
-
-  96% {
-    opacity: 1;
-    transform: rotate(-12deg);
-  }
-
-  100% {
-    opacity: 1;
-    transform: rotate(10deg);
-  }
-}
-
-.trp-crochet-piece {
-  opacity: 0;
-  transform-origin: 92px 122px;
-  animation: trp-crochet-grow 5.2s ease-in-out forwards;
-}
-
-@keyframes trp-crochet-grow {
-
-  0%,
-  91% {
-    opacity: 0;
-    transform: scale(.15);
-  }
-
-  95% {
-    opacity: 1;
-    transform: scale(.65);
-  }
-
-  98% {
-    opacity: 1;
-    transform: scale(1.05);
-  }
-
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-@media (max-width: 600px) {
-  .trp-cat {
-    left: 7px;
-    bottom: 8px;
-    width: 68px;
-  }
-
-  .trp-yarn-fall {
-    left: 9px;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .trp-yarn-fall {
-    animation: none;
-    opacity: 0;
-  }
-
-  .trp-cat {
-    animation: none;
-  }
-
-  .trp-cat-head,
-  .trp-cat-paw-left,
-  .trp-cat-paw-right,
-  .trp-mini-yarn,
-  .trp-hook,
-  .trp-crochet-piece {
-    animation: none;
-  }
-
-  .trp-mini-yarn,
-  .trp-hook,
-  .trp-crochet-piece {
-    opacity: 1;
-  }
-}
-
-/* =========================================================
-   PRODUCT DETAIL VIEW, WISHLIST DRAWER & STORE V1 UTILITIES
-   Uses exact existing design tokens & typography
-   ========================================================= */
-
-.product-detail {
-  padding: 40px 6%;
-  max-width: 1200px;
+.about-text-wrap {
+  max-width: 640px;
   margin: 0 auto;
 }
 
-.product-detail-back {
-  background: transparent;
-  border: 0;
-  font-size: 15px;
+.about-lead {
+  font: 500 24px/1.35 "Cormorant Garamond", serif;
+  margin-bottom: 18px;
+  color: var(--espresso);
+}
+
+.about p {
   color: var(--muted);
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 30px;
-  cursor: pointer;
-  padding: 8px 0;
-  transition: color 0.2s ease;
+  font-size: 15px;
+  line-height: 1.65;
+  margin: 0 0 16px;
 }
 
-.product-detail-back:hover {
+.about-signature {
+  font-style: italic;
+  font-family: "Cormorant Garamond", serif;
+  font-size: 18px;
+  margin-top: 24px !important;
+  color: var(--espresso) !important;
+}
+
+/* =========================================================
+   CONTACT SECTION & FOOTER (EXACTLY MATCHING IMAGE 5)
+   ========================================================= */
+.contact-section {
+  padding: 85px 6% 35px;
+  background: #ffffff;
+  border-top: 1px solid var(--line);
+}
+
+.contact-inner {
+  max-width: 860px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.contact-heading .eyebrow {
+  justify-content: center;
+  letter-spacing: .25em;
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+
+.contact-heading h2 {
+  font: 500 46px/1.15 "Cormorant Garamond", serif;
   color: var(--espresso);
+  margin: 0 0 16px;
 }
 
-.product-detail-content {
+.contact-heading p {
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.6;
+  max-width: 500px;
+  margin: 0 auto 50px;
+}
+
+.contact-links {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 50px;
-  align-items: start;
+  grid-template-columns: repeat(3, 1fr);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
 }
 
-.product-detail-image {
-  position: relative;
-  background: var(--soft-cream);
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
-}
-
-.product-detail-image img {
-  width: 100%;
-  height: 520px;
-  object-fit: cover;
-  display: block;
-}
-
-.detail-image-wishlist {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.92);
-  border: 0;
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  color: var(--espresso);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  transition: all 0.2s ease;
-}
-
-.detail-image-wishlist:hover {
-  transform: scale(1.08);
-}
-
-.detail-image-wishlist.active {
-  color: #c94a4a;
-}
-
-.product-detail-info {
+.contact-links a {
+  padding: 32px 16px;
   display: flex;
   flex-direction: column;
-  padding: 10px 0;
+  gap: 8px;
+  border-right: 1px solid var(--line);
+  transition: background 0.2s ease;
 }
 
-.product-detail-info .eyebrow {
-  font-size: 12px;
-  letter-spacing: 0.15em;
+.contact-links a:last-child {
+  border-right: none;
+}
+
+.contact-links a:hover {
+  background: var(--soft-cream);
+}
+
+.contact-links span {
+  font-size: 11px;
+  letter-spacing: .18em;
   text-transform: uppercase;
-  color: var(--blush-strong);
-  margin-bottom: 10px;
-}
-
-.product-detail-info h1 {
-  font: 500 38px/1.15 "Cormorant Garamond", serif;
-  margin: 0 0 14px;
-  color: var(--espresso);
-}
-
-.product-detail-price {
-  font-size: 24px;
-  font-weight: 500;
-  color: var(--espresso);
-  margin: 0 0 24px;
-}
-
-.product-detail-description {
-  font-size: 15px;
-  line-height: 1.7;
   color: var(--muted);
-  margin: 0 0 24px;
-  white-space: pre-line;
 }
 
-.product-custom-note {
-  background: var(--soft-cream);
-  border-left: 3px solid var(--blush-strong);
-  padding: 14px 18px;
-  font-size: 13px;
-  color: var(--espresso);
-  border-radius: 0 6px 6px 0;
-  margin-bottom: 28px;
-}
-
-.product-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-top: 10px;
-}
-
-.detail-whatsapp {
-  background: #25D366;
-  color: #ffffff;
-  border: 0;
-  padding: 15px 28px;
-  border-radius: 30px;
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  cursor: pointer;
-  text-decoration: none;
-  box-shadow: 0 4px 14px rgba(37, 211, 102, 0.28);
-  transition: all 0.25s ease;
-}
-
-.detail-whatsapp:hover {
-  background: #20b858;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(37, 211, 102, 0.35);
-}
-
-.detail-wishlist-toggle {
-  background: transparent;
-  border: 1px solid var(--line);
-  padding: 13px 28px;
-  border-radius: 30px;
+.contact-links strong {
   font-size: 14px;
-  color: var(--espresso);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  transition: all 0.2s ease;
-}
-
-.detail-wishlist-toggle:hover {
-  border-color: var(--blush-strong);
-  background: var(--blush-pale);
-}
-
-.card-whatsapp-btn {
-  border: 0;
-  background: var(--blush-pale);
-  color: var(--espresso);
-  padding: 6px 14px;
-  border-radius: 20px;
-  font-size: 12px;
   font-weight: 500;
-  display: inline-flex;
+  color: var(--espresso);
+  word-break: break-all;
+}
+
+.contact-bottom {
+  display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 5px;
-  cursor: pointer;
-  transition: all 0.2s ease;
+  margin-top: 60px;
+  padding-top: 24px;
+  border-top: 1px solid rgba(232, 221, 216, 0.4);
+  font-size: 13px;
+  color: var(--muted);
 }
 
-.card-whatsapp-btn:hover {
-  background: #25D366;
-  color: #fff;
-}
-
-/* OVERLAY & WISHLIST DRAWER PANEL */
+/* =========================================================
+   OVERLAY & SLIDE-OUT DRAWERS (CART & WISHLIST)
+   ========================================================= */
 .overlay {
   position: fixed;
   inset: 0;
   background: rgba(48, 37, 31, 0.45);
   backdrop-filter: blur(3px);
-  z-index: 100;
+  z-index: 1000;
   display: flex;
   justify-content: flex-end;
   animation: trp-fade-in 0.25s ease;
@@ -1274,8 +984,8 @@ footer p {
   width: 100%;
   max-width: 440px;
   height: 100%;
-  background: var(--cream);
-  padding: 30px 24px;
+  background: #ffffff;
+  padding: 32px 24px;
   box-shadow: -4px 0 24px rgba(0, 0, 0, 0.1);
   display: flex;
   flex-direction: column;
@@ -1297,7 +1007,7 @@ footer p {
   border: 0;
   color: var(--espresso);
   cursor: pointer;
-  padding: 4px;
+  padding: 6px;
   display: grid;
   place-items: center;
   border-radius: 50%;
@@ -1305,20 +1015,28 @@ footer p {
 }
 
 .close-panel:hover {
-  background: var(--blush-pale);
+  background: var(--soft-cream);
 }
 
 .cart-panel h2 {
   font: 500 28px "Cormorant Garamond", serif;
   margin: 0 0 20px;
-  padding-bottom: 12px;
+  padding-bottom: 14px;
   border-bottom: 1px solid var(--line);
+}
+
+.cart-items-scroll {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .cart-item {
   display: flex;
-  gap: 16px;
-  padding: 16px 0;
+  gap: 14px;
+  padding: 14px 0;
   border-bottom: 1px solid var(--line);
   align-items: center;
 }
@@ -1327,7 +1045,7 @@ footer p {
   width: 72px;
   height: 72px;
   object-fit: cover;
-  border-radius: 6px;
+  border-radius: 4px;
   background: var(--soft-cream);
   cursor: pointer;
 }
@@ -1353,38 +1071,101 @@ footer p {
   color: var(--espresso);
 }
 
-.cart-item-actions {
-  display: flex;
-  gap: 10px;
+.quantity-controls {
+  display: inline-flex;
   align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 3px;
 }
 
-.cart-item-actions .item-whatsapp-btn {
+.quantity-controls button {
+  background: transparent;
+  border: 0;
+  padding: 3px 10px;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.quantity-controls span {
+  padding: 0 8px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.cart-item-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 6px;
+}
+
+.item-add-cart-btn {
+  background: #000000;
+  color: #fff;
+  border: 0;
+  padding: 4px 12px;
+  border-radius: 14px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.item-whatsapp-btn {
   background: #25D366;
   color: #fff;
   border: 0;
-  padding: 5px 12px;
-  border-radius: 16px;
+  padding: 4px 12px;
+  border-radius: 14px;
   font-size: 11px;
   font-weight: 600;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+  cursor: pointer;
 }
 
-.cart-item-actions .item-remove-btn {
+.item-remove-btn {
   background: transparent;
   border: 0;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   cursor: pointer;
   text-decoration: underline;
-  padding: 2px 4px;
+  padding: 4px;
 }
 
-.cart-item-actions .item-remove-btn:hover {
-  color: #c94a4a;
+.item-remove-btn:hover {
+  color: #e04848;
+}
+
+.cart-footer {
+  border-top: 1px solid var(--line);
+  padding-top: 18px;
+  margin-top: 12px;
+}
+
+.cart-total {
+  display: flex;
+  justify-content: space-between;
+  font-size: 18px;
+  margin-bottom: 18px;
+}
+
+.checkout-whatsapp-btn {
+  background: #000000;
+  color: #ffffff;
+  border: 0;
+  border-radius: 3px;
+  width: 100%;
+  padding: 14px;
+  font-size: 14px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.checkout-whatsapp-btn:hover {
+  background: #262626;
 }
 
 .empty-state {
@@ -1398,7 +1179,71 @@ footer p {
   line-height: 1.6;
 }
 
-/* FLOATING TOAST NOTIFICATION */
+/* =========================================================
+   ACCOUNT MODAL
+   ========================================================= */
+.account-modal {
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 32px 28px;
+  max-width: 420px;
+  width: 90%;
+  position: relative;
+  margin: auto;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  animation: trp-fade-in 0.25s ease;
+}
+
+.account-modal-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.account-avatar {
+  font-size: 32px;
+  display: block;
+  margin-bottom: 10px;
+}
+
+.account-modal-header h3 {
+  font: 500 24px "Cormorant Garamond", serif;
+  margin: 0 0 6px;
+  color: var(--espresso);
+}
+
+.account-modal-header p {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0;
+}
+
+.account-menu button,
+.account-menu a {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 16px;
+  background: var(--soft-cream);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  margin-bottom: 10px;
+  font-size: 14px;
+  color: var(--espresso);
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s ease;
+}
+
+.account-menu button:hover,
+.account-menu a:hover {
+  background: var(--blush-pale);
+  border-color: var(--blush-strong);
+}
+
+/* =========================================================
+   FLOATING TOAST NOTIFICATION
+   ========================================================= */
 .toast-popup {
   position: fixed;
   bottom: 24px;
@@ -1429,67 +1274,154 @@ footer p {
   }
 }
 
-/* HEADER BADGES & SEARCH BAR */
-.header-actions .wishlist-btn {
-  position: relative;
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-  padding: 6px;
-  display: grid;
-  place-items: center;
-}
+/* =========================================================
+   RESPONSIVE DESIGN (TABLET & MOBILE)
+   ========================================================= */
+@media (max-width: 900px) {
+  .hero {
+    display: flex;
+    flex-direction: column-reverse;
+    height: auto;
+    min-height: auto;
+    position: relative;
+  }
 
-.header-actions .badge {
-  position: absolute;
-  top: 0;
-  right: 0;
-  background: var(--blush-strong);
-  color: #ffffff;
-  font-size: 10px;
-  font-weight: 600;
-  width: 17px;
-  height: 17px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-}
+  .hero-copy {
+    padding: 36px 20px 24px;
+    align-items: center;
+    text-align: center;
+    width: 100%;
+  }
 
-.search-box-wrap {
-  width: 100%;
-  padding: 12px 6%;
-  background: var(--soft-cream);
-  border-bottom: 1px solid var(--line);
-  display: flex;
-  justify-content: center;
-  animation: trp-fade-in 0.2s ease;
-}
+  .hero-copy p {
+    margin: 0 auto 20px;
+  }
 
-.search-box-wrap input {
-  width: 100%;
-  max-width: 500px;
-  padding: 10px 18px;
-  border: 1px solid var(--line);
-  border-radius: 24px;
-  background: #ffffff;
-  font: inherit;
-  font-size: 14px;
-  outline: none;
-}
+  .eyebrow {
+    justify-content: center;
+  }
 
-.search-box-wrap input:focus {
-  border-color: var(--blush-strong);
-}
+  .title-line {
+    margin: 14px auto 14px;
+  }
 
-@media (max-width: 850px) {
+  .hero-image-wrap {
+    height: 380px;
+    min-height: 380px;
+    width: 100%;
+  }
+
+  .hero-cat-wrapper {
+    position: relative;
+    left: auto;
+    bottom: auto;
+    width: 115px;
+    height: 185px;
+    margin: 18px auto 0;
+  }
+
   .product-detail-content {
     grid-template-columns: 1fr;
     gap: 30px;
   }
+
   .product-detail-image img {
-    height: 380px;
+    height: 360px;
   }
-  .product-detail-info h1 {
-    font-size: 30px;
+
+  .product-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 22px 14px;
+  }
+
+  .contact-links {
+    grid-template-columns: 1fr;
+  }
+
+  .contact-links a {
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+    padding: 20px 16px;
+  }
+
+  .contact-links a:last-child {
+    border-bottom: none;
+  }
+
+  .contact-bottom {
+    flex-direction: column;
+    gap: 12px;
+    text-align: center;
+  }
+}
+
+@media (max-width: 850px) {
+  .nav {
+    display: none;
+    position: absolute;
+    top: 76px;
+    left: 0;
+    right: 0;
+    background: #ffffff;
+    border-bottom: 1px solid var(--line);
+    padding: 16px 20px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.06);
+  }
+
+  .nav.nav-open {
+    display: flex;
+  }
+
+  .nav > a,
+  .shop-nav > button {
+    padding: 12px 6px;
+    border-bottom: 1px solid var(--soft-cream);
+  }
+
+  .mobile-icon {
+    display: block;
+  }
+
+  .header-actions .account-btn {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .header {
+    height: 64px;
+    padding: 0 16px;
+  }
+
+  .logo {
+    font-size: 24px;
+  }
+
+  .logo-emoji {
+    font-size: 20px;
+  }
+
+  .hero h1 {
+    font-size: 46px;
+  }
+
+  .product-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 16px 10px;
+  }
+
+  .product-info h3 {
+    font-size: 15px;
+  }
+
+  .product-info p {
+    font-size: 13px;
+  }
+
+  .contact-heading h2 {
+    font-size: 34px;
   }
 }

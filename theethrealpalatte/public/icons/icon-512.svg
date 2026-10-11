@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="128" fill="#faf5f1"/>
+  <circle cx="256" cy="256" r="210" fill="#f7e5e3" stroke="#d99b98" stroke-width="12"/>
+  
+  <!-- Sage green yarn ball -->
+  <g transform="translate(180, 200)">
+    <circle cx="0" cy="0" r="85" fill="#88A878" stroke="#5C7A4E" stroke-width="8"/>
+    <path d="M -55 -35 Q 0 -65 55 -35" stroke="#4B683E" stroke-width="7" fill="none"/>
+    <path d="M -65 5 Q 0 -15 65 5" stroke="#4B683E" stroke-width="7" fill="none"/>
+    <path d="M -50 45 Q 0 20 50 45" stroke="#4B683E" stroke-width="7" fill="none"/>
+    <circle cx="-20" cy="-20" r="16" fill="#A4C294" opacity="0.6"/>
+  </g>
+
+  <!-- Cute Cat Peeking -->
+  <g transform="translate(320, 310)">
+    <!-- Ears -->
+    <path d="M -60 -35 Q -75 -85 -30 -68 Z" fill="#FFFFFF" stroke="#222222" stroke-width="6" stroke-linejoin="round"/>
+    <path d="M -52 -38 Q -62 -72 -38 -62 Z" fill="#FFAEC9"/>
+    <path d="M 60 -35 Q 75 -85 30 -68 Z" fill="#FFFFFF" stroke-width="6" stroke="#222222" stroke-linejoin="round"/>
+    <path d="M 52 -38 Q 62 -72 38 -62 Z" fill="#FFAEC9"/>
+
+    <!-- Head -->
+    <ellipse cx="0" cy="0" rx="64" ry="50" fill="#FFFFFF" stroke="#222222" stroke-width="6"/>
+
+    <!-- Eyes -->
+    <circle cx="-25" cy="-6" r="7" fill="#222222"/>
+    <circle cx="-27" cy="-8" r="2.5" fill="#FFFFFF"/>
+    <circle cx="25" cy="-6" r="7" fill="#222222"/>
+    <circle cx="23" cy="-8" r="2.5" fill="#FFFFFF"/>
+
+    <!-- Cheeks -->
+    <ellipse cx="-40" cy="8" rx="10" ry="6" fill="#FFAAA6" opacity="0.8"/>
+    <ellipse cx="40" cy="8" rx="10" ry="6" fill="#FFAAA6" opacity="0.8"/>
+
+    <!-- Mouth -->
+    <path d="M -9 8 Q -4 13 0 8 Q 4 13 9 8" stroke="#222222" stroke-width="4" stroke-linecap="round" fill="none"/>
+  </g>
+</svg>

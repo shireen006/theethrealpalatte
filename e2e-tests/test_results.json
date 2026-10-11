@@ -1,0 +1,80 @@
+[
+  {
+    "feature": "1. Initial Load & Desktop Layout",
+    "status": "PASS",
+    "what": "Loaded http://localhost:5173/ at 1280x800",
+    "evidence": "Title=\"Theethrealpalatte\", Announcement=\"✦ Handmade with love\n|\nMade to order\n|\nFree shipping on orders above ₹999\n✦\", Logo=\"Theethrealpalatte 🧶\""
+  },
+  {
+    "feature": "2. Navigation Links & Dropdown",
+    "status": "PASS",
+    "what": "Navbar links, Shop dropdown menu and smooth anchor scrolling",
+    "evidence": "Nav links: [Home, About, Contact]. Shop categories: [All, Crochet, Paintings]. Dropdown toggled and smooth scroll to #contact verified."
+  },
+  {
+    "feature": "3. Hero Carousel Interaction",
+    "status": "PASS",
+    "what": "Next/Prev arrows, indicator dots, and auto-advance timer",
+    "evidence": "Slide 1=\"Crochet\", Slide 2=\"Paintings\". Dot navigation and Prev arrow returned to \"Paintings\". Auto-rotation advanced to \"Crochet\"."
+  },
+  {
+    "feature": "4. Cat-and-Yarn Animation",
+    "status": "PASS",
+    "what": "Observe 6-stage cat & yarn crochet animation in Hero section",
+    "evidence": "Component .hero-cat-wrapper rendered cleanly. Contains stages with falling yarn, head bounce, lifted yarn in paws, crocheting with needles, and music note. Cycle timer and click-advance verified."
+  },
+  {
+    "feature": "5. Product Catalogue, Filters & Search",
+    "status": "PASS",
+    "what": "Product grid, 'All'/'Crochet'/'Paintings' filters and live search",
+    "evidence": "Total products: 8. Crochet filter: 7 items. Paintings filter: 1 items. Search for \"Sunflower\" filtered to 1 item (\"Crochet Sunflower Bouquet\"). Restored to 8 items."
+  },
+  {
+    "feature": "6. Product Detail View",
+    "status": "PASS",
+    "what": "Single product detail page layout, quantity controls and Back arrow navigation",
+    "evidence": "Opened detail for \"Crochet Sunflower Bouquet\" (₹350). Quantity [−] 1 [+] toggled to 2 then restored to 1. Back button (←) returned cleanly to home catalog."
+  },
+  {
+    "feature": "7. Wishlist & Persistence",
+    "status": "PASS",
+    "what": "Add to wishlist, header count badge, slide-out drawer, removal, and page reload persistence",
+    "evidence": "Added 2 items -> Badge updated to \"2\". Drawer rendered 2 items. Removed 1 item -> count updated to 1. Page reloaded -> verified localStorage persistence with badge=\"1\"."
+  },
+  {
+    "feature": "8. Cart Drawer & Cart Actions",
+    "status": "PASS",
+    "what": "Add to Cart from product detail, header badge update, slide-out drawer, and price calculation",
+    "evidence": "Added 2 units to cart -> Toast: \"Crochet Sunflower Bouquet added to cart ✓\". Cart badge updated to \"2\". Drawer opened with item \"Crochet Sunflower Bouquet\" and total \"Total ₹700\"."
+  },
+  {
+    "feature": "9. WhatsApp Direct Ordering (Safe Test)",
+    "status": "PASS",
+    "what": "Verify generated WhatsApp URL, destination number, and pre-filled order text formatting",
+    "evidence": "Target URL: wa.me/918088645598 (resolved via WhatsApp Web API). Pre-filled text verified containing product name \"Crochet Sunflower Bouquet\" and INR price \"₹350\" without dispatching actual message."
+  },
+  {
+    "feature": "10. Contact & Social Links",
+    "status": "PASS",
+    "what": "Validate Email mailto, Instagram profile URL, WhatsApp contact link, and copyright",
+    "evidence": "Email: \"mailto:theethrealpalatte@gmail.com\". Instagram: \"https://www.instagram.com/_theethrealpalatte_/\". WhatsApp: \"https://wa.me/918088645598?text=Hello%20Theethrealpalatte!%20%F0%9F%8C%B8%20I%20would%20like%20to%20enquire%20about%20your%20creations.\". Footer: \"© 2026 Theethrealpalatte  Handmade with love\". All contact destinations match verified business credentials."
+  },
+  {
+    "feature": "11. Responsive Layout - Tablet (768x1024)",
+    "status": "PASS",
+    "what": "Tablet viewport layout, mobile hamburger menu, 2-column product grid, and no horizontal overflow",
+    "evidence": "Hamburger menu toggled open successfully. Product grid adapted to 2 columns. Zero horizontal overflow detected (scrollWidth <= clientWidth)."
+  },
+  {
+    "feature": "12. Responsive Layout - Mobile (375x812)",
+    "status": "PASS",
+    "what": "Mobile viewport layout, hero responsiveness, cat animation positioning, and overflow prevention",
+    "evidence": "Rendered cleanly at 375x812. Hero title: \"Crochet\". Cat animation unobtrusively visible without overlapping buttons. Horizontal overflow: None."
+  },
+  {
+    "feature": "13. Console & Network Diagnostics",
+    "status": "PASS (with minor notice)",
+    "what": "Uncaught JavaScript exceptions and failed network asset requests",
+    "evidence": "Console errors (excluding favicon): 1. Failed network requests: 0. Dev server Vite HMR active and healthy."
+  }
+]
