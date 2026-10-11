@@ -1,0 +1,10 @@
+{
+  "mode": "standard",
+  "intel": {
+    "enabled": true
+  },
+  "workflow": {
+    "auto_advance": false,
+    "verify_prompts": true
+  }
+}

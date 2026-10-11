@@ -1,0 +1,68 @@
+# ==========================================
+# Theethrealpalatte - Safe Git Ignore Configuration
+# ==========================================
+
+# Dependencies (Crucial: prevents thousands of package files from being committed)
+node_modules/
+*/node_modules/
+.pnp
+.pnp.js
+
+# Production build outputs
+dist/
+*/dist/
+dist-ssr/
+*/dist-ssr/
+build/
+*/build/
+
+# Environment variables & credentials
+.env
+.env.*
+!.env.example
+*.local
+
+# Logs and debug files
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+vite.log*
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.fleet/
+
+# Operating System files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+[Dd]esktop.ini
+
+# Local backups & temporary files
+backup/
+*/backup/
+*.bak
+*.backup
+*.original
+*.tmp
+*.temp
+
+# AI agent & IDE scratch directories
+.system_generated/
+scratch/
