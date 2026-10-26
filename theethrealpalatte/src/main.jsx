@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { createRoot } from "react-dom/client";
 import {
   Search,
@@ -14,6 +14,7 @@ import {
   MessageCircle,
 } from "lucide-react";
 
+import heroBouquet from "./images/download (5).jpg";
 import crochetHero from "./images/crochet-hero.jpg";
 import paintingHero from "./images/painting-hero.jpeg";
 import sunflowerbouquet from "./images/sunflowerbouquet.jpg";
@@ -21,9 +22,20 @@ import sunflowerkeychain from "./images/keychain.jpg";
 import fourleafcloverkeychain from "./images/fourleafcloverkeychain.jpg";
 import butterflyhairtie from "./images/butterflyhairtie.jpg";
 import bowhairtie from "./images/bowhairtie.jpeg";
+import bluedreambouquet from "./images/bluedreambouquet.jpg";
+import crimsonlilybouquet from "./images/crimsonlilybouquet.jpg";
+import miniforeverbouquet from "./images/miniforeverbouquet.jpg";
 
 import "./styles.css";
 import { BUSINESS_CONFIG } from "./config.js";
+import AuthModal from "./components/AuthModal.jsx";
+import AdminDashboard from "./components/AdminDashboard.jsx";
+
+const ANNOUNCEMENT_MESSAGES = [
+  "Handmade with love",
+  "Made to order",
+  "Customization available",
+];
 
 const slides = [
   {
@@ -33,14 +45,16 @@ const slides = [
     image: crochetHero,
     alt: "Handmade crochet collection",
     filter: "Crochet",
+    position: "center center",
   },
   {
-    eyebrow: "ORIGINAL ART",
-    title: "Paintings",
-    text: "Colours, stories & little moments.",
-    image: paintingHero,
-    alt: "Original handmade paintings",
-    filter: "Paintings",
+    eyebrow: "CHENILLE BOUQUETS",
+    title: "Bloom Studio",
+    text: "Chenille Flower Bouquets",
+    image: heroBouquet,
+    alt: "Handmade chenille flower bouquets",
+    filter: "Bloom Studio",
+    position: "center center",
   },
 ];
 
@@ -91,34 +105,31 @@ const products = [
       "A sweet handmade bow for your everyday look.\nSimple, delicate, and made with love.",
   },
   {
-    id: 6,
-    name: "Crochet Flower Pot",
-    price: 899,
-    type: "Crochet",
-    image:
-      "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=800&q=85",
-    description:
-      "A charming handmade flower pot to brighten your space.\nA timeless piece of crochet decor.",
-  },
-  {
     id: 7,
-    name: "Botanical Painting",
-    price: 899,
-    type: "Paintings",
-    image:
-      "https://images.unsplash.com/photo-1579783901586-d88db74b4fe4?auto=format&fit=crop&w=800&q=85",
+    name: "Blue Dream Bouquet",
+    price: 199,
+    type: "Bloom Studio",
+    image: bluedreambouquet,
     description:
-      "An original botanical-inspired artwork.\nCreated to bring a soft touch of nature into your space.",
+      "A dreamy handcrafted blue flower bouquet with an elegant birthday card and delicate ribbon.\nMade slowly and thoughtfully with love.",
   },
   {
-    id: 8,
-    name: "Crochet Flower",
-    price: 299,
-    type: "Crochet",
-    image:
-      "https://images.unsplash.com/photo-1604881988758-f76ad2f7aac1?auto=format&fit=crop&w=800&q=85",
+    id: 9,
+    name: "Crimson Lily Bouquet",
+    price: 300,
+    type: "Bloom Studio",
+    image: crimsonlilybouquet,
     description:
-      "A delicate handmade crochet flower.\nA lovely little piece to keep or gift.",
+      "Handmade burgundy and white chenille flower bouquet finished with a soft pink ribbon.\nMade slowly and thoughtfully with love.",
+  },
+  {
+    id: 10,
+    name: "Mini Forever Bouquet",
+    price: 250,
+    type: "Bloom Studio",
+    image: miniforeverbouquet,
+    description:
+      "A delicate mini eternal bouquet crafted slowly and thoughtfully with love.\nAn everlasting keepsake for someone special.",
   },
 ];
 
@@ -131,21 +142,30 @@ const products = [
  * Frame 5: Kitten pops up higher, raises both paws, and lifts the yarn ball with paws!
  * Frame 6: Kitten sits happily with yarn ball to the left, thread connecting, crocheting a green patch with needles/hook, music note floating!
  */
-function HeroCatAnimation() {
+const STAGE_DURATIONS = {
+  1: 650,  // Yarn starts falling from sky
+  2: 500,  // Yarn zooming toward kitten
+  3: 550,  // Impact BONK / !? surprise
+  4: 950,  // Contented smile (^w^) with yarn on head
+  5: 850,  // Lifts yarn with raised paws
+  6: 2000, // Crocheting with needles and floating music note
+};
+
+function HeroCatAnimation({ isMobile = false }) {
   const [stage, setStage] = useState(1);
 
   useEffect(() => {
-    // Stage timings matching the natural progression of the animation sequence
-    const interval = setInterval(() => {
+    // Dynamic natural stage timings for smooth lively animation
+    const timer = setTimeout(() => {
       setStage((prev) => (prev >= 6 ? 1 : prev + 1));
-    }, 1800);
+    }, STAGE_DURATIONS[stage] || 800);
 
-    return () => clearInterval(interval);
-  }, []);
+    return () => clearTimeout(timer);
+  }, [stage]);
 
   return (
     <div
-      className="hero-cat-wrapper"
+      className={isMobile ? "hero-cat-wrapper hero-cat-mobile" : "hero-cat-wrapper hero-cat-desktop"}
       title="Click to replay kitty crochet animation! 🧶"
       onClick={() => setStage((prev) => (prev >= 6 ? 1 : prev + 1))}
     >
@@ -165,14 +185,14 @@ function HeroCatAnimation() {
             STAGE 1: YARN BALL FALLING FROM SKY, CAT PEEKING
             ========================================================= */}
         {stage === 1 && (
-          <g className="stage-1-group">
+          <g className="stage-1-group cat-stage-group">
             {/* Speed streaks above yarn */}
             <line x1="75" y1="5" x2="75" y2="28" stroke="#a0b898" strokeWidth="2" strokeDasharray="4 3" />
             <line x1="64" y1="12" x2="64" y2="34" stroke="#a0b898" strokeWidth="1.5" strokeDasharray="3 3" />
             <line x1="86" y1="10" x2="86" y2="32" stroke="#a0b898" strokeWidth="1.5" strokeDasharray="3 3" />
 
-            {/* Sage Green Yarn Ball falling at top */}
-            <g transform="translate(75, 48)">
+            {/* Sage Green Yarn Ball falling smoothly from top */}
+            <g className="yarn-fall-1" transform="translate(75, 48)">
               <circle cx="0" cy="0" r="17" fill="#88A878" stroke="#5C7A4E" strokeWidth="1.8" />
               {/* Yarn thread lines */}
               <path d="M -11 -7 Q 0 -13 11 -7" stroke="#4B683E" strokeWidth="1.4" fill="none" />
@@ -218,14 +238,14 @@ function HeroCatAnimation() {
             STAGE 2: YARN BALL FALLING LOWER, CAT LOOKING UP
             ========================================================= */}
         {stage === 2 && (
-          <g className="stage-2-group">
+          <g className="stage-2-group cat-stage-group">
             {/* Speed streaks */}
             <line x1="75" y1="50" x2="75" y2="85" stroke="#a0b898" strokeWidth="2" strokeDasharray="4 3" />
             <line x1="64" y1="58" x2="64" y2="92" stroke="#a0b898" strokeWidth="1.5" strokeDasharray="3 3" />
             <line x1="86" y1="56" x2="86" y2="90" stroke="#a0b898" strokeWidth="1.5" strokeDasharray="3 3" />
 
-            {/* Yarn Ball at mid-height */}
-            <g transform="translate(75, 115)">
+            {/* Yarn Ball zooming to mid-height */}
+            <g className="yarn-fall-2" transform="translate(75, 115)">
               <circle cx="0" cy="0" r="17" fill="#88A878" stroke="#5C7A4E" strokeWidth="1.8" />
               <path d="M -11 -7 Q 0 -13 11 -7" stroke="#4B683E" strokeWidth="1.4" fill="none" />
               <path d="M -13 1 Q 0 -4 13 1" stroke="#4B683E" strokeWidth="1.4" fill="none" />
@@ -266,14 +286,14 @@ function HeroCatAnimation() {
             STAGE 3: BONK / BOUNCE ON CAT HEAD WITH !? & SURPRISE
             ========================================================= */}
         {stage === 3 && (
-          <g className="stage-3-group">
+          <g className="stage-3-group cat-stage-group">
             {/* Impact sparkle bursts */}
             <line x1="48" y1="178" x2="38" y2="168" stroke="#222222" strokeWidth="2" strokeLinecap="round" />
             <line x1="102" y1="178" x2="112" y2="168" stroke="#222222" strokeWidth="2" strokeLinecap="round" />
             <line x1="75" y1="168" x2="75" y2="158" stroke="#222222" strokeWidth="2" strokeLinecap="round" />
 
             {/* Comic !? and Sweat drops */}
-            <text x="14" y="196" fontFamily="'Comic Sans MS', sans-serif, system-ui" fontSize="24" fontWeight="bold" fill="#222222">
+            <text className="bonk-exclamation" x="14" y="196" fontFamily="'Comic Sans MS', sans-serif, system-ui" fontSize="24" fontWeight="bold" fill="#222222">
               !?
             </text>
             <path d="M 116 198 Q 120 192 122 198 Q 122 202 119 202 Q 116 202 116 198 Z" fill="#69C0FF" />
@@ -286,8 +306,8 @@ function HeroCatAnimation() {
               <path d="M -9 8 Q 0 4 9 8" stroke="#4B683E" strokeWidth="1.4" fill="none" />
             </g>
 
-            {/* Cat with startled squinting face (> <) */}
-            <g transform="translate(75, 240)">
+            {/* Cat with startled squinting face (> <) with squash & stretch */}
+            <g className="cat-bonk-squash" transform="translate(75, 240)">
               {/* Ears flattened in surprise */}
               <path d="M -34 -16 Q -48 -32 -22 -32 Z" fill="#FFFFFF" stroke="#222222" strokeWidth="2.4" strokeLinejoin="round" />
               <path d="M -30 -18 Q -40 -28 -24 -28 Z" fill="#FFAEC9" />
@@ -318,7 +338,7 @@ function HeroCatAnimation() {
             STAGE 4: YARN RESTING SNUGLY ON HEAD, HAPPY SMILING CAT
             ========================================================= */}
         {stage === 4 && (
-          <g className="stage-4-group">
+          <g className="stage-4-group cat-stage-group">
             {/* Yarn resting settled on head */}
             <g transform="translate(75, 186)">
               <circle cx="0" cy="0" r="16.5" fill="#88A878" stroke="#5C7A4E" strokeWidth="1.8" />
@@ -328,8 +348,8 @@ function HeroCatAnimation() {
               <circle cx="-4" cy="-4" r="2.8" fill="#A4C294" opacity="0.6" />
             </g>
 
-            {/* Happy contented Cat (^w^) */}
-            <g transform="translate(75, 238)">
+            {/* Happy contented Cat (^w^) with gentle purr */}
+            <g className="cat-smile-settle" transform="translate(75, 238)">
               {/* Ears relaxed */}
               <path d="M -34 -20 Q -40 -48 -18 -38 Z" fill="#FFFFFF" stroke="#222222" strokeWidth="2.4" strokeLinejoin="round" />
               <path d="M -30 -22 Q -34 -41 -22 -35 Z" fill="#FFAEC9" />
@@ -359,7 +379,7 @@ function HeroCatAnimation() {
             STAGE 5: CAT POPS UP, LIFTS YARN WITH BOTH PAWS
             ========================================================= */}
         {stage === 5 && (
-          <g className="stage-5-group">
+          <g className="stage-5-group cat-stage-group">
             {/* Motion sparkles/lines around lifting paws */}
             <path d="M 38 188 Q 34 196 38 204" stroke="#222222" strokeWidth="1.6" strokeLinecap="round" fill="none" />
             <path d="M 112 188 Q 116 196 112 204" stroke="#222222" strokeWidth="1.6" strokeLinecap="round" fill="none" />
@@ -373,8 +393,8 @@ function HeroCatAnimation() {
               <circle cx="-4" cy="-4" r="2.8" fill="#A4C294" opacity="0.6" />
             </g>
 
-            {/* Cat body & Head */}
-            <g transform="translate(75, 234)">
+            {/* Cat body & Head popped up */}
+            <g className="cat-lift-pop" transform="translate(75, 234)">
               {/* Ears */}
               <path d="M -34 -20 Q -42 -48 -18 -38 Z" fill="#FFFFFF" stroke="#222222" strokeWidth="2.4" strokeLinejoin="round" />
               <path d="M -30 -22 Q -35 -41 -22 -35 Z" fill="#FFAEC9" />
@@ -417,9 +437,9 @@ function HeroCatAnimation() {
             STAGE 6: CAT SITTING, CROCHETING A GREEN PIECE WITH NEEDLES!
             ========================================================= */}
         {stage === 6 && (
-          <g className="stage-6-group">
+          <g className="stage-6-group cat-stage-group">
             {/* Pink Floating Music Note (♪) */}
-            <g transform="translate(112, 175)">
+            <g className="music-note-float" transform="translate(112, 175)">
               <ellipse cx="0" cy="6" rx="3.5" ry="2.5" fill="#FF758F" transform="rotate(-20)" />
               <line x1="2.5" y1="4" x2="2.5" y2="-8" stroke="#FF758F" strokeWidth="1.8" strokeLinecap="round" />
               <path d="M 2.5 -8 Q 8 -11 9 -5" stroke="#FF758F" strokeWidth="1.8" strokeLinecap="round" fill="none" />
@@ -468,15 +488,17 @@ function HeroCatAnimation() {
               {/* Happy smiling cat mouth (:3) */}
               <path d="M -5 3 Q -2.5 6 0 3 Q 2.5 6 5 3" stroke="#222222" strokeWidth="1.8" strokeLinecap="round" fill="none" />
 
-              {/* Crochet Hook / Knitting Needles in paws */}
-              <line x1="-16" y1="12" x2="14" y2="30" stroke="#7A685D" strokeWidth="2.2" strokeLinecap="round" />
-              <line x1="16" y1="12" x2="-14" y2="30" stroke="#7A685D" strokeWidth="2.2" strokeLinecap="round" />
+              {/* Rhythmic Crochet Hook / Knitting Needles in paws */}
+              <g className="crochet-needles-motion">
+                <line x1="-16" y1="12" x2="14" y2="30" stroke="#7A685D" strokeWidth="2.2" strokeLinecap="round" />
+                <line x1="16" y1="12" x2="-14" y2="30" stroke="#7A685D" strokeWidth="2.2" strokeLinecap="round" />
 
-              {/* The Green Crochet Patch in paws! */}
-              <g transform="translate(0, 22)">
-                <rect x="-10" y="-4" width="20" height="15" rx="3" fill="#88A878" stroke="#5C7A4E" strokeWidth="1.4" />
-                <line x1="-7" y1="1" x2="7" y2="1" stroke="#4B683E" strokeWidth="1" strokeDasharray="2 1.5" />
-                <line x1="-7" y1="6" x2="7" y2="6" stroke="#4B683E" strokeWidth="1" strokeDasharray="2 1.5" />
+                {/* The Green Crochet Patch in paws! */}
+                <g transform="translate(0, 22)">
+                  <rect x="-10" y="-4" width="20" height="15" rx="3" fill="#88A878" stroke="#5C7A4E" strokeWidth="1.4" />
+                  <line x1="-7" y1="1" x2="7" y2="1" stroke="#4B683E" strokeWidth="1" strokeDasharray="2 1.5" />
+                  <line x1="-7" y1="6" x2="7" y2="6" stroke="#4B683E" strokeWidth="1" strokeDasharray="2 1.5" />
+                </g>
               </g>
 
               {/* Paws holding the needles & work */}
@@ -485,7 +507,7 @@ function HeroCatAnimation() {
 
               {/* Little feet at bottom */}
               <ellipse cx="-18" cy="36" rx="8" ry="5" fill="#FFFFFF" stroke="#222222" strokeWidth="2" />
-              <ellipse cx="18" cy="36" rx="8" ry="5" fill="#FFFFFF" stroke="#222222" strokeWidth="2" />
+              <ellipse cx="18" cy="36" rx="8" ry="5.5" fill="#FFFFFF" stroke="#222222" strokeWidth="2" />
             </g>
           </g>
         )}
@@ -505,6 +527,130 @@ export default function App() {
   const [showSearch, setShowSearch] = useState(false);
   const [showMessage, setShowMessage] = useState("");
   const [showAccountModal, setShowAccountModal] = useState(false);
+
+  // Track recently viewed product IDs in sessionStorage
+  const [recentlyViewedIds, setRecentlyViewedIds] = useState(() => {
+    try {
+      const stored = sessionStorage.getItem("trp_recently_viewed");
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Customer Authentication & Popup State
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const u = localStorage.getItem("trp_user");
+      return u ? JSON.parse(u) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authNotice, setAuthNotice] = useState("");
+  const [pendingCartAction, setPendingCartAction] = useState(null);
+
+  // Rotating announcement state for mobile carousel
+  const [announcementIndex, setAnnouncementIndex] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setAnnouncementIndex((prev) => (prev + 1) % ANNOUNCEMENT_MESSAGES.length);
+    }, 3200);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Admin View State
+  const [isAdminView, setIsAdminView] = useState(() => {
+    return window.location.hash === "#admin" || window.location.pathname === "/admin";
+  });
+
+  useEffect(() => {
+    const handleHash = () => {
+      if (window.location.hash === "#admin" || window.location.pathname === "/admin") {
+        setIsAdminView(true);
+      } else {
+        setIsAdminView(false);
+      }
+    };
+    window.addEventListener("hashchange", handleHash);
+    return () => window.removeEventListener("hashchange", handleHash);
+  }, []);
+
+  // Products loaded from backend database (with graceful fallback to default catalogue)
+  const [productList, setProductList] = useState(products);
+
+  useEffect(() => {
+    fetch("/api/products")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.success && Array.isArray(data.products) && data.products.length > 0) {
+          const mapped = data.products.map((p) => {
+            const id = p.originalId || p._id;
+            let img = p.image;
+            if (id === 1 || p.name.includes("Sunflower Bouquet")) img = sunflowerbouquet;
+            else if (id === 2 || p.name.includes("Flower Keychains")) img = sunflowerkeychain;
+            else if (id === 3 || p.name.includes("Four Leaf Clover")) img = fourleafcloverkeychain;
+            else if (id === 4 || p.name.includes("Butterfly Hairtie")) img = butterflyhairtie;
+            else if (id === 5 || p.name.includes("Bow Clip")) img = bowhairtie;
+            else if (id === 7 || p.name.includes("Blue Dream")) img = bluedreambouquet;
+            else if (id === 9 || p.name.includes("Crimson Lily")) img = crimsonlilybouquet;
+            else if (id === 10 || p.name.includes("Mini Forever")) img = miniforeverbouquet;
+            return {
+              ...p,
+              id,
+              image: img,
+            };
+          }).filter((p) => p.type !== "Paintings");
+          setProductList(mapped);
+        }
+      })
+      .catch((err) => {
+        console.warn("Backend API not reachable, using offline catalog:", err);
+      });
+  }, []);
+
+  // Verify auth session on load & trigger first-time visitor login popup
+  useEffect(() => {
+    const token = localStorage.getItem("trp_token");
+    if (token) {
+      fetch("/api/auth/me", {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then((r) => r.json())
+        .then((data) => {
+          if (data && data.success) {
+            setCurrentUser(data.user);
+            localStorage.setItem("trp_user", JSON.stringify(data.user));
+            // Sync cart from backend
+            fetch("/api/cart", {
+              headers: { Authorization: `Bearer ${token}` },
+            })
+              .then((cRes) => cRes.json())
+              .then((cData) => {
+                if (cData && cData.success && Array.isArray(cData.cart) && cData.cart.length > 0) {
+                  setCart(cData.cart);
+                }
+              })
+              .catch(() => { });
+          } else {
+            localStorage.removeItem("trp_token");
+            localStorage.removeItem("trp_user");
+            setCurrentUser(null);
+          }
+        })
+        .catch(() => { });
+    } else {
+      const dismissed = sessionStorage.getItem("trp_login_dismissed");
+      if (!dismissed) {
+        const timer = setTimeout(() => {
+          setShowAuthModal(true);
+        }, 800);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, []);
 
   // PWA Installation Prompt State
   const [deferredPrompt, setDeferredPrompt] = useState(null);
@@ -533,7 +679,7 @@ export default function App() {
     }
   };
 
-  // Cart State (Persisted in localStorage)
+  // Cart State (Persisted in localStorage & synchronized with backend)
   const [cart, setCart] = useState(() => {
     try {
       const saved = localStorage.getItem("trp_cart");
@@ -552,6 +698,20 @@ export default function App() {
       // ignore
     }
   }, [cart]);
+
+  const syncBackendCart = (cartItems) => {
+    const token = localStorage.getItem("trp_token");
+    if (token) {
+      fetch("/api/cart", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ items: cartItems }),
+      }).catch(() => { });
+    }
+  };
 
   // Wishlist State (Persisted in localStorage)
   const [wishlist, setWishlist] = useState(() => {
@@ -584,12 +744,12 @@ export default function App() {
   const current = slides[slide];
 
   // Filtering products
-  const visibleProducts = products.filter((p) => {
+  const visibleProducts = productList.filter((p) => {
     const matchesFilter = filter === "All" || p.type === filter;
     const matchesSearch =
       !searchQuery ||
       p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.description.toLowerCase().includes(searchQuery.toLowerCase());
+      (p.description && p.description.toLowerCase().includes(searchQuery.toLowerCase()));
     return matchesFilter && matchesSearch;
   });
 
@@ -600,19 +760,23 @@ export default function App() {
     setShowMessage(msg);
     setTimeout(() => {
       setShowMessage("");
-    }, 2400);
+    }, 2800);
   };
 
   const isWishlisted = (product) => {
     if (!product) return false;
-    return wishlist.some((item) => item.id === product.id);
+    const prodId = product.id || product._id;
+    return wishlist.some((item) => (item.id || item._id) === prodId);
   };
 
   const toggleWishlist = (product) => {
     if (!product) return;
+    const prodId = product.id || product._id;
     const exists = isWishlisted(product);
     if (exists) {
-      setWishlist((currentList) => currentList.filter((item) => item.id !== product.id));
+      setWishlist((currentList) =>
+        currentList.filter((item) => (item.id || item._id) !== prodId)
+      );
       showPopup(`${product.name} removed from wishlist`);
     } else {
       setWishlist((currentList) => [...currentList, product]);
@@ -620,42 +784,74 @@ export default function App() {
     }
   };
 
-  const addToCart = (product, quantity = 1) => {
+  // Internal Add to Cart execution
+  const executeAddToCart = (product, quantity = 1) => {
     if (!product) return;
+    const prodId = product.id || product._id;
     setCart((currentCart) => {
-      const existing = currentCart.find((item) => item.id === product.id);
+      const existing = currentCart.find((item) => (item.id || item.productId || item._id) === prodId);
+      let updated;
       if (existing) {
-        return currentCart.map((item) =>
-          item.id === product.id
+        updated = currentCart.map((item) =>
+          (item.id || item.productId || item._id) === prodId
             ? { ...item, quantity: item.quantity + quantity }
             : item
         );
+      } else {
+        updated = [...currentCart, { ...product, id: prodId, quantity }];
       }
-      return [...currentCart, { ...product, quantity }];
+      syncBackendCart(updated);
+      return updated;
     });
-    showPopup(`${product.name} added to cart ✓`);
+    showPopup("Added to your cart ♡");
+  };
+
+  // Add to cart — REQUIRES LOGIN FOR GUESTS
+  const addToCart = (product, quantity = 1) => {
+    if (!product) return;
+    if (!currentUser) {
+      setPendingCartAction({ product, quantity });
+      setAuthNotice("Please sign in or create an account to add items to your cart.");
+      setShowAuthModal(true);
+      return;
+    }
+    executeAddToCart(product, quantity);
   };
 
   const increaseQuantity = (id) => {
-    setCart((currentCart) =>
-      currentCart.map((item) =>
-        item.id === id ? { ...item, quantity: item.quantity + 1 } : item
-      )
-    );
+    setCart((currentCart) => {
+      const updated = currentCart.map((item) =>
+        (item.id || item.productId || item._id) === id
+          ? { ...item, quantity: item.quantity + 1 }
+          : item
+      );
+      syncBackendCart(updated);
+      return updated;
+    });
   };
 
   const decreaseQuantity = (id) => {
-    setCart((currentCart) =>
-      currentCart
+    setCart((currentCart) => {
+      const updated = currentCart
         .map((item) =>
-          item.id === id ? { ...item, quantity: item.quantity - 1 } : item
+          (item.id || item.productId || item._id) === id
+            ? { ...item, quantity: item.quantity - 1 }
+            : item
         )
-        .filter((item) => item.quantity > 0)
-    );
+        .filter((item) => item.quantity > 0);
+      syncBackendCart(updated);
+      return updated;
+    });
   };
 
   const removeFromCart = (id) => {
-    setCart((currentCart) => currentCart.filter((item) => item.id !== id));
+    setCart((currentCart) => {
+      const updated = currentCart.filter(
+        (item) => (item.id || item.productId || item._id) !== id
+      );
+      syncBackendCart(updated);
+      return updated;
+    });
   };
 
   const cartCount = cart.reduce((total, item) => total + item.quantity, 0);
@@ -667,6 +863,24 @@ export default function App() {
 
   const orderSingleOnWhatsApp = (product, quantity = 1) => {
     if (!product) return;
+
+    // Record enquiry in backend
+    const token = localStorage.getItem("trp_token");
+    fetch("/api/orders", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({
+        customerName: currentUser ? currentUser.name : "WhatsApp Customer",
+        customerEmail: currentUser ? currentUser.email : "whatsapp.enquiry@theethrealpalatte.com",
+        customerPhone: currentUser ? currentUser.phone || "+91 8088645598" : "+91 8088645598",
+        items: [{ ...product, quantity }],
+        orderType: "whatsapp_enquiry",
+      }),
+    }).catch(() => { });
+
     const message =
       `Hi! I'd like to order:\n\n` +
       `Product: ${product.name}\n` +
@@ -680,6 +894,23 @@ export default function App() {
 
   const orderCartOnWhatsApp = () => {
     if (cart.length === 0) return;
+
+    // Record enquiry in backend
+    const token = localStorage.getItem("trp_token");
+    fetch("/api/orders", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({
+        customerName: currentUser ? currentUser.name : "WhatsApp Customer",
+        customerEmail: currentUser ? currentUser.email : "whatsapp.enquiry@theethrealpalatte.com",
+        customerPhone: currentUser ? currentUser.phone || "+91 8088645598" : "+91 8088645598",
+        items: cart,
+        orderType: "whatsapp_enquiry",
+      }),
+    }).catch(() => { });
 
     let message =
       `Hello Theethrealpalatte! 🌷\n\n` +
@@ -699,6 +930,18 @@ export default function App() {
     window.open(whatsappURL, "_blank", "noopener,noreferrer");
   };
 
+  // If viewing admin portal, render AdminDashboard
+  if (isAdminView) {
+    return (
+      <AdminDashboard
+        onBackToStore={() => {
+          setIsAdminView(false);
+          window.location.hash = "";
+        }}
+      />
+    );
+  }
+
   const scrollToSection = (id) => {
     setSelectedProduct(null);
     setMenuOpen(false);
@@ -714,21 +957,82 @@ export default function App() {
   };
 
   const openProductDetail = (product) => {
+    if (!product) {
+      setSelectedProduct(null);
+      return;
+    }
     setSelectedProduct(product);
     setDetailQuantity(1);
     window.scrollTo({ top: 0, behavior: "smooth" });
+
+    // Track recently viewed in sessionStorage (most recent first, exclude current from prior list)
+    setRecentlyViewedIds((prev) => {
+      const pId = product.id;
+      const filtered = prev.filter((id) => id !== pId);
+      const next = [pId, ...filtered].slice(0, 10);
+      try {
+        sessionStorage.setItem("trp_recently_viewed", JSON.stringify(next));
+      } catch (e) {
+        console.warn("Could not write recently viewed:", e);
+      }
+      return next;
+    });
   };
+
+  // Related products: 4 products, excluding current, prioritizing same category
+  const relatedProducts = useMemo(() => {
+    if (!selectedProduct) return [];
+    const sameCategory = productList.filter(
+      (p) => p.id !== selectedProduct.id && p.type === selectedProduct.type
+    );
+    const otherCategory = productList.filter(
+      (p) => p.id !== selectedProduct.id && p.type !== selectedProduct.type
+    );
+    return [...sameCategory, ...otherCategory].slice(0, 4);
+  }, [selectedProduct, productList]);
+
+  // Recently Viewed products: up to 4 previously viewed items, most recent first, excluding current
+  const recentlyViewedProducts = useMemo(() => {
+    if (!selectedProduct) return [];
+    const ids = recentlyViewedIds.filter((id) => id !== selectedProduct.id);
+    const found = [];
+    for (const id of ids) {
+      const match = productList.find((p) => p.id === id);
+      if (match) {
+        found.push(match);
+      }
+      if (found.length === 4) break;
+    }
+    return found;
+  }, [selectedProduct, recentlyViewedIds, productList]);
 
   return (
     <div className="site">
+      {/* Persistent Mobile Floating Cat (bottom-left corner on all pages) */}
+      <HeroCatAnimation isMobile />
+
       {/* ANNOUNCEMENT BAR */}
       <aside className="announcement">
-        <span>✦ Handmade with love</span>
-        <span>|</span>
-        <span>Made to order</span>
-        <span>|</span>
-        <span>Free shipping on orders above ₹999</span>
-        <span>✦</span>
+        <div className="announcement-desktop">
+          <span>✦ Handmade with love</span>
+          <span>|</span>
+          <span>Made to order</span>
+          <span>|</span>
+          <span>Customization available</span>
+          <span>|</span>
+          <span>Free shipping on orders above ₹999</span>
+          <span>✦</span>
+        </div>
+        <div className="announcement-mobile" aria-live="polite">
+          <div className="announcement-mobile-rotating">
+            <span key={announcementIndex} className="announcement-slide">
+              {ANNOUNCEMENT_MESSAGES[announcementIndex]}
+            </span>
+          </div>
+          <div className="announcement-mobile-shipping">
+            <span>Free shipping on orders above ₹999</span>
+          </div>
+        </div>
       </aside>
 
       {/* HEADER */}
@@ -751,7 +1055,22 @@ export default function App() {
           }}
         >
           Theethrealpalatte
-          <span className="logo-emoji"> 🧶</span>
+          <span className="logo-floral" aria-hidden="true">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <circle cx="10" cy="5.5" r="2.6" opacity="0.9" />
+              <circle cx="14.2" cy="8.6" r="2.6" opacity="0.9" />
+              <circle cx="12.6" cy="13.6" r="2.6" opacity="0.9" />
+              <circle cx="7.4" cy="13.6" r="2.6" opacity="0.9" />
+              <circle cx="5.8" cy="8.6" r="2.6" opacity="0.9" />
+              <circle cx="10" cy="10" r="1.8" fill="#FFF8F7" />
+            </svg>
+          </span>
         </a>
 
         <nav className={`nav ${menuOpen ? "nav-open" : ""}`}>
@@ -805,11 +1124,11 @@ export default function App() {
                   onClick={(e) => {
                     e.preventDefault();
                     setSelectedProduct(null);
-                    setFilter("Paintings");
+                    setFilter("Bloom Studio");
                     scrollToSection("products");
                   }}
                 >
-                  Paintings
+                  Bloom Studio
                 </a>
               </div>
             )}
@@ -836,19 +1155,25 @@ export default function App() {
           >
             Contact
           </a>
+
+          <button
+            className="mobile-nav-account-btn"
+            onClick={() => {
+              setMenuOpen(false);
+              if (currentUser) {
+                setShowAccountModal(true);
+              } else {
+                setAuthNotice("");
+                setShowAuthModal(true);
+              }
+            }}
+          >
+            <UserRound size={17} />
+            <span>{currentUser ? `My Account (${currentUser.name})` : "Sign In / Register"}</span>
+          </button>
         </nav>
 
         <div className="header-actions">
-          {canInstall && (
-            <button
-              className="pwa-header-install"
-              onClick={installPwa}
-              title="Install Theethrealpalatte App"
-            >
-              Install App 📲
-            </button>
-          )}
-
           <button
             aria-label="Search collection"
             onClick={() => setShowSearch(!showSearch)}
@@ -869,7 +1194,15 @@ export default function App() {
           <button
             className="action-btn account-btn"
             aria-label="Account"
-            onClick={() => setShowAccountModal(true)}
+            onClick={() => {
+              if (currentUser) {
+                setShowAccountModal(true);
+              } else {
+                setAuthNotice("");
+                setShowAuthModal(true);
+              }
+            }}
+            title={currentUser ? `Logged in as ${currentUser.name}` : "Sign In / Register"}
           >
             <UserRound size={19} />
           </button>
@@ -890,7 +1223,7 @@ export default function App() {
         <div className="search-box-wrap">
           <input
             type="text"
-            placeholder="Search crochet, bouquets, keychains, paintings..."
+            placeholder="Search crochet, bouquets, keychains, flowers..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             autoFocus
@@ -1000,6 +1333,92 @@ export default function App() {
                 </div>
               </div>
             </div>
+
+            {/* YOU MAY ALSO LIKE (RELATED PRODUCTS) */}
+            {relatedProducts.length > 0 && (
+              <div className="product-recommendations-section">
+                <div className="section-heading" style={{ marginTop: "70px", marginBottom: "32px" }}>
+                  <span></span>
+                  <h2>You May Also Like</h2>
+                  <span></span>
+                  <p>HANDPICKED FOR YOU</p>
+                </div>
+                <div className="related-product-grid">
+                  {relatedProducts.map((p) => (
+                    <article
+                      key={p.id}
+                      className="product-card related-card"
+                      onClick={() => openProductDetail(p)}
+                      style={{ cursor: "pointer" }}
+                    >
+                      <div className="product-image">
+                        <img src={p.image} alt={p.name} />
+                      </div>
+                      <div className="product-info">
+                        <div>
+                          <h3 onClick={() => openProductDetail(p)} style={{ cursor: "pointer" }}>
+                            {p.name}
+                          </h3>
+                          <p>₹{p.price.toLocaleString("en-IN")}</p>
+                        </div>
+                      </div>
+                      <button
+                        className="view-product-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openProductDetail(p);
+                        }}
+                      >
+                        View Product →
+                      </button>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* RECENTLY VIEWED */}
+            {recentlyViewedProducts.length > 0 && (
+              <div className="product-recommendations-section">
+                <div className="section-heading" style={{ marginTop: "60px", marginBottom: "32px" }}>
+                  <span></span>
+                  <h2>Recently Viewed</h2>
+                  <span></span>
+                  <p>PREVIOUSLY EXPLORED</p>
+                </div>
+                <div className="related-product-grid">
+                  {recentlyViewedProducts.map((p) => (
+                    <article
+                      key={p.id}
+                      className="product-card related-card"
+                      onClick={() => openProductDetail(p)}
+                      style={{ cursor: "pointer" }}
+                    >
+                      <div className="product-image">
+                        <img src={p.image} alt={p.name} />
+                      </div>
+                      <div className="product-info">
+                        <div>
+                          <h3 onClick={() => openProductDetail(p)} style={{ cursor: "pointer" }}>
+                            {p.name}
+                          </h3>
+                          <p>₹{p.price.toLocaleString("en-IN")}</p>
+                        </div>
+                      </div>
+                      <button
+                        className="view-product-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openProductDetail(p);
+                        }}
+                      >
+                        View Product →
+                      </button>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            )}
           </section>
         </main>
       ) : (
@@ -1044,6 +1463,7 @@ export default function App() {
                 src={current.image}
                 alt={current.alt}
                 className="hero-image"
+                style={{ objectPosition: current.position || "center center" }}
               />
               <div className="hero-soft-overlay"></div>
             </div>
@@ -1055,31 +1475,20 @@ export default function App() {
             >
               <ChevronRight size={20} />
             </button>
-
-            <div className="dots">
-              {slides.map((_, i) => (
-                <button
-                  key={i}
-                  className={`dot ${slide === i ? "active" : ""}`}
-                  onClick={() => setSlide(i)}
-                  aria-label={`Go to slide ${i + 1}`}
-                />
-              ))}
-            </div>
           </section>
 
           {/* PRODUCTS CATALOG SECTION */}
           <section className="products-section" id="products">
             <div className="section-heading">
               <span></span>
-              <h2>Our Collection</h2>
+              <h2>{filter === "Bloom Studio" ? "Bloom Studio" : filter === "Crochet" ? "Crochet Collection" : "Our Collection"}</h2>
               <span></span>
-              <p>HANDMADE WITH LOVE</p>
+              <p>{filter === "Bloom Studio" ? "Chenille Flower Bouquets" : "HANDMADE WITH LOVE"}</p>
             </div>
 
             {/* CATEGORY FILTERS */}
             <div className="filters">
-              {["All", "Crochet", "Paintings"].map((category) => (
+              {["All", "Crochet", "Bloom Studio"].map((category) => (
                 <button
                   key={category}
                   className={filter === category ? "selected" : ""}
@@ -1175,73 +1584,81 @@ export default function App() {
             )}
           </section>
 
-          {/* ABOUT SECTION */}
-          <section className="about" id="about">
-            <div className="section-heading">
-              <span></span>
-              <h2>About Us</h2>
-              <span></span>
-              <p>THE ART OF HANDCRAFT</p>
-            </div>
-
-            <div className="about-text-wrap">
-              <p className="about-lead">
-                Every piece at Theethrealpalatte is created slowly with affection,
-                patience, and careful attention to detail.
-              </p>
-              <p>
-                From cheerful crochet sunflower bouquets to delicate botanical paintings,
-                each piece is handmade to bring warmth, beauty, and heartfelt joy to your daily life.
-              </p>
-              <p className="about-signature">— Theethrealpalatte 🤍</p>
+          {/* ABOUT SECTION (EXACT REFERENCE MATCH) */}
+          <section className="about-section" id="about">
+            <div className="about-container">
+              <span className="about-eyebrow">ABOUT THEETHREALPALATTE</span>
+              <div className="about-content">
+                <h2 className="about-title">
+                  Made slowly.<br />
+                  Made with feeling.
+                </h2>
+                <div className="about-body">
+                  <p className="about-p1">
+                    Theethrealpalatte is a little space for handmade things, thoughtful details, and art made from the heart.
+                  </p>
+                  <p className="about-p2">
+                    From delicate crochet pieces to original paintings, every creation is made by hand, one piece at a time. No two pieces are exactly alike — and that's what makes them special.
+                  </p>
+                  <p className="about-signature">— Theethrealpalatte</p>
+                </div>
+              </div>
             </div>
           </section>
         </main>
       )}
 
-      {/* CONTACT SECTION & FOOTER (EXACTLY MATCHING IMAGE 5) */}
+      {/* CONTACT SECTION & FOOTER (MATCHING UPLOADED REFERENCE) */}
       <footer className="contact-section" id="contact">
-        <div className="contact-inner">
-          <div className="contact-heading">
-            <p className="eyebrow">GET IN TOUCH</p>
-            <h2>
-              Let's create something<br />beautiful.
-            </h2>
-            <p>
-              Have a question, want to place an order, or simply want to say hello? We'd
-              love to hear from you.
-            </p>
+        <div className="contact-container">
+          <div className="contact-columns">
+            {/* Left column */}
+            <div className="contact-left">
+              <span className="contact-eyebrow">GET IN TOUCH</span>
+              <h2 className="contact-heading">
+                Let's create something<br />beautiful.
+              </h2>
+              <p className="contact-description">
+                Have a question, want to place an order, or simply want to say hello? We'd
+                love to hear from you.
+              </p>
+            </div>
+
+            {/* Right column: 3 horizontal contact rows */}
+            <div className="contact-right">
+              <a href={`mailto:${BUSINESS_CONFIG.email}`} className="contact-row">
+                <span className="contact-label">EMAIL</span>
+                <span className="contact-val">{BUSINESS_CONFIG.email}</span>
+              </a>
+
+              <a
+                href={BUSINESS_CONFIG.instagramUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="contact-row"
+              >
+                <span className="contact-label">INSTAGRAM</span>
+                <span className="contact-val">{BUSINESS_CONFIG.instagramHandle}</span>
+              </a>
+
+              <a
+                href={`https://wa.me/${BUSINESS_CONFIG.whatsappNumber}?text=${encodeURIComponent("Hello Theethrealpalatte! 🌸 I would like to enquire about your creations.")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="contact-row"
+              >
+                <span className="contact-label">WHATSAPP</span>
+                <span className="contact-val">Message us</span>
+              </a>
+            </div>
           </div>
 
-          <div className="contact-links">
-            <a href={`mailto:${BUSINESS_CONFIG.email}`}>
-              <span>EMAIL</span>
-              <strong>{BUSINESS_CONFIG.email}</strong>
-            </a>
+          <div className="contact-footer-divider"></div>
 
-            <a
-              href={BUSINESS_CONFIG.instagramUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <span>INSTAGRAM</span>
-              <strong>{BUSINESS_CONFIG.instagramHandle}</strong>
-            </a>
-
-            <a
-              href={`https://wa.me/${BUSINESS_CONFIG.whatsappNumber}?text=${encodeURIComponent("Hello Theethrealpalatte! 🌸 I would like to enquire about your creations.")}`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <span>WHATSAPP</span>
-              <strong>Message us</strong>
-            </a>
+          <div className="contact-bottom">
+            <p>© 2026 Theethrealpalatte</p>
+            <p>Handmade with love.</p>
           </div>
-        </div>
-
-        <div className="contact-bottom">
-          <p>© 2026 Theethrealpalatte</p>
-          <p>Handmade with love</p>
         </div>
       </footer>
 
@@ -1450,10 +1867,29 @@ export default function App() {
             </button>
             <div className="account-modal-header">
               <span className="account-avatar">🤍</span>
-              <h3>Welcome to Theethrealpalatte</h3>
-              <p>Handmade crochet & original paintings made slowly with love.</p>
+              <h3>
+                {currentUser ? `Welcome back, ${currentUser.name}` : "Welcome to Theethrealpalatte"}
+              </h3>
+              <p>
+                {currentUser
+                  ? currentUser.email
+                  : "Handmade crochet & original paintings made slowly with love."}
+              </p>
             </div>
             <div className="account-menu">
+              {currentUser?.role === "admin" && (
+                <button
+                  style={{ fontWeight: "600", color: "var(--espresso)" }}
+                  onClick={() => {
+                    setShowAccountModal(false);
+                    setIsAdminView(true);
+                    window.location.hash = "admin";
+                  }}
+                >
+                  <span style={{ marginRight: "6px" }}>⚙️</span>
+                  <span>Admin Management Portal</span>
+                </button>
+              )}
               <button
                 onClick={() => {
                   setShowAccountModal(false);
@@ -1473,24 +1909,64 @@ export default function App() {
                 <span>My Cart ({cartCount})</span>
               </button>
               <a
-                href={`https://wa.me/${BUSINESS_CONFIG.whatsappNumber}?text=${encodeURIComponent("Hello! I would like to request a custom crochet / painting order.")}`}
+                href={`https://wa.me/${BUSINESS_CONFIG.whatsappNumber}?text=${encodeURIComponent("Hello! I would like to request a custom crochet / bouquet order.")}`}
                 target="_blank"
                 rel="noopener noreferrer"
               >
                 <MessageCircle size={18} />
                 <span>Request Custom Order on WhatsApp</span>
               </a>
-
-              {canInstall && (
-                <button onClick={installPwa} className="account-install-btn">
-                  <span>📲</span>
-                  <span>Install Theethrealpalatte App (PWA)</span>
+              {currentUser ? (
+                <button
+                  style={{ color: "#9b1c1c", marginTop: "12px", borderTop: "1px solid var(--line)", paddingTop: "14px" }}
+                  onClick={() => {
+                    localStorage.removeItem("trp_token");
+                    localStorage.removeItem("trp_user");
+                    setCurrentUser(null);
+                    setShowAccountModal(false);
+                    showPopup("Logged out successfully");
+                  }}
+                >
+                  <X size={18} />
+                  <span>Sign Out</span>
+                </button>
+              ) : (
+                <button
+                  style={{ fontWeight: "600", marginTop: "8px" }}
+                  onClick={() => {
+                    setShowAccountModal(false);
+                    setAuthNotice("");
+                    setShowAuthModal(true);
+                  }}
+                >
+                  <UserRound size={18} />
+                  <span>Sign In / Create Account</span>
                 </button>
               )}
             </div>
           </div>
         </div>
       )}
+
+      {/* CUSTOMER LOGIN & SIGNUP POPUP */}
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => {
+          setShowAuthModal(false);
+          setPendingCartAction(null);
+          setAuthNotice("");
+        }}
+        onAuthSuccess={(user, token) => {
+          setCurrentUser(user);
+          showPopup(`Welcome, ${user.name}! 🌸`);
+          if (pendingCartAction) {
+            executeAddToCart(pendingCartAction.product, pendingCartAction.quantity);
+            setPendingCartAction(null);
+            setAuthNotice("");
+          }
+        }}
+        noticeMessage={authNotice}
+      />
 
       {/* FLOATING TOAST NOTIFICATION */}
       {showMessage && (
