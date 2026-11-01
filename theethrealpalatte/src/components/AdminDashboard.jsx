@@ -17,6 +17,7 @@ import {
   Sparkles,
   Tag,
   Layers,
+  Check,
 } from "lucide-react";
 import { supabase, isSupabaseConfigured } from "../lib/supabase.js";
 
@@ -1088,18 +1089,26 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
         <div className="admin-modal-overlay" onClick={() => setShowProductModal(false)}>
           <div
             className="admin-modal-card"
-            style={{ maxWidth: "780px" }}
             onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="modal-title"
           >
-            <div className="admin-modal-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-              <div>
-                <h3>{editingProduct ? "Edit Product" : "Add New Product"}</h3>
-                <p>Configure product details, pricing, category, and live storefront preview</p>
+            <div className="admin-modal-header">
+              <div className="admin-modal-header-text">
+                <span className="admin-modal-eyebrow">
+                  <Sparkles size={13} style={{ color: "var(--blush-strong)" }} />
+                  {editingProduct ? "Boutique Item Editor" : "New Catalogue Entry"}
+                </span>
+                <h3 id="modal-title">{editingProduct ? "Edit Product" : "Add New Product"}</h3>
+                <p>Configure product details, pricing, inventory count, and observe your live storefront preview</p>
               </div>
               <button
                 type="button"
                 className="modal-close-btn"
                 onClick={() => setShowProductModal(false)}
+                title="Close modal"
+                aria-label="Close modal"
               >
                 <X size={18} />
               </button>
@@ -1108,9 +1117,12 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
             <form onSubmit={handleSaveProduct} className="admin-modal-form">
               <div className="admin-modal-grid">
                 {/* LEFT COLUMN: FORM FIELDS */}
-                <div>
+                <div className="admin-form-fields">
+                  {/* PRODUCT NAME */}
                   <div className="form-group">
-                    <label>Product Name *</label>
+                    <label>
+                      Product Name <span className="req">*</span>
+                    </label>
                     <input
                       type="text"
                       value={productForm.name}
@@ -1120,18 +1132,24 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
                     />
                   </div>
 
+                  {/* PRICE & CATEGORY */}
                   <div className="form-row-2">
                     <div className="form-group">
-                      <label>Price (₹ INR) *</label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="1"
-                        value={productForm.price}
-                        onChange={(e) => setProductForm({ ...productForm, price: e.target.value })}
-                        placeholder="350"
-                        required
-                      />
+                      <label>
+                        Price (₹ INR) <span className="req">*</span>
+                      </label>
+                      <div className="input-with-prefix">
+                        <span className="input-prefix">₹</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={productForm.price}
+                          onChange={(e) => setProductForm({ ...productForm, price: e.target.value })}
+                          placeholder="350"
+                          required
+                        />
+                      </div>
                     </div>
                     <div className="form-group">
                       <label>Category</label>
@@ -1147,88 +1165,121 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
                     </div>
                   </div>
 
+                  {/* DESCRIPTION */}
                   <div className="form-group">
-                    <label>Description</label>
+                    <label>Product Description</label>
                     <textarea
                       rows={3}
                       value={productForm.description}
                       onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
-                      placeholder="Handmade sunshine, just for you..."
+                      placeholder="Handmade sunshine, crafted slowly with high quality yarn..."
                     />
                   </div>
 
+                  {/* STOCK & AVAILABILITY */}
                   <div className="form-row-2">
                     <div className="form-group">
-                      <label>Stock Count</label>
+                      <label>Stock Quantity</label>
                       <input
                         type="number"
                         min="0"
                         value={productForm.stock}
-                        onChange={(e) => setProductForm({ ...productForm, stock: e.target.value })}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          const num = Number(val);
+                          setProductForm({
+                            ...productForm,
+                            stock: val,
+                            isAvailable: num > 0 ? productForm.isAvailable : false,
+                          });
+                        }}
                       />
                     </div>
-                    <div className="form-group" style={{ display: "flex", alignItems: "center", paddingTop: "20px" }}>
-                      <label style={{ display: "inline-flex", alignItems: "center", gap: "8px", cursor: "pointer", textTransform: "none", fontSize: "13px" }}>
-                        <input
-                          type="checkbox"
-                          checked={productForm.isAvailable}
-                          onChange={(e) => setProductForm({ ...productForm, isAvailable: e.target.checked })}
-                          style={{ width: "auto" }}
-                        />
-                        Available for WhatsApp Enquiry
+                    <div className="form-group" style={{ display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+                      <label style={{ visibility: "hidden" }}>Status</label>
+                      <label
+                        className="admin-switch-label"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setProductForm({ ...productForm, isAvailable: !productForm.isAvailable });
+                        }}
+                      >
+                        <div className={`admin-switch-track ${productForm.isAvailable ? "active" : ""}`}>
+                          <div className="admin-switch-thumb" />
+                        </div>
+                        <span>{productForm.isAvailable ? "Available in Store" : "Marked Out of Stock"}</span>
                       </label>
                     </div>
                   </div>
 
-                  <div className="form-group">
-                    <label>Product Image</label>
-                    <div className="image-upload-zone" style={{ marginBottom: "8px" }}>
-                      <label className="file-upload-btn">
-                        <Upload size={14} /> Upload Image File
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={handleImageFileChange}
-                          style={{ display: "none" }}
-                        />
-                      </label>
-                      <span className="file-name-label">
-                        {productImageFile ? productImageFile.name : "or paste image URL below"}
-                      </span>
+                  {/* IMAGE UPLOAD & URL */}
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label>Product Imagery</label>
+                    <div
+                      className="image-upload-box"
+                      onClick={() => document.getElementById("admin-product-file-input").click()}
+                    >
+                      <div className="image-upload-icon-circle">
+                        <Upload size={17} />
+                      </div>
+                      <div className="image-upload-text">
+                        <strong>
+                          {productImageFile ? productImageFile.name : "Choose an image from your device"}
+                        </strong>
+                        <span>JPG, PNG, WebP up to 5MB</span>
+                      </div>
+                      <input
+                        id="admin-product-file-input"
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageFileChange}
+                        style={{ display: "none" }}
+                      />
                     </div>
+
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px", margin: "10px 0 6px" }}>
+                      <span style={{ fontSize: "11px", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>
+                        or link image URL
+                      </span>
+                      <div style={{ height: "1px", background: "var(--line)", width: "100%" }} />
+                    </div>
+
                     <input
                       type="url"
                       placeholder="https://... image web link"
                       value={productForm.imageUrl}
                       onChange={(e) => {
-                        setProductForm({ ...productForm, imageUrl: e.target.value });
-                        if (!productImageFile) setProductImagePreview(e.target.value);
+                        const val = e.target.value;
+                        setProductForm({ ...productForm, imageUrl: val });
+                        if (!productImageFile) setProductImagePreview(val);
                       }}
                     />
                   </div>
                 </div>
 
-                {/* RIGHT COLUMN: LIVE STOREFRONT PREVIEW CARD */}
-                <div>
-                  <div style={{ fontSize: "11px", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted)", fontWeight: "600", marginBottom: "8px" }}>
-                    Live Storefront Card Preview
+                {/* RIGHT COLUMN: LIVE STOREFRONT CARD PREVIEW */}
+                <div className="preview-container-box">
+                  <div className="preview-badge-header">
+                    <span className="preview-badge">
+                      <span className="preview-badge-dot" />
+                      Live Storefront Card Preview
+                    </span>
+                    <span style={{ fontSize: "11px", color: productForm.isAvailable ? "#2b7a3e" : "#a83232", fontWeight: "600" }}>
+                      {productForm.isAvailable ? "In Stock" : "Hidden"}
+                    </span>
                   </div>
-                  <div
-                    style={{
-                      border: "1px solid var(--line)",
-                      borderRadius: "8px",
-                      overflow: "hidden",
-                      background: "#ffffff",
-                      boxShadow: "0 6px 18px rgba(0,0,0,0.06)",
-                    }}
-                  >
-                    <div style={{ position: "relative", width: "100%", height: "200px", background: "var(--cream)" }}>
+
+                  <div className="preview-card-frame">
+                    <div className="preview-card-img-wrap">
                       <img
-                        src={productImagePreview || productForm.imageUrl || "https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?w=400"}
+                        src={
+                          productImagePreview ||
+                          productForm.imageUrl ||
+                          resolveProductImage({ name: productForm.name, type: productForm.type })
+                        }
                         alt="Product preview"
-                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
                         onError={(e) => {
-                          e.target.src = "https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?w=400";
+                          e.target.src = sunflowerbouquet;
                         }}
                       />
                       {!productForm.isAvailable && (
@@ -1237,51 +1288,68 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
                             position: "absolute",
                             top: "10px",
                             left: "10px",
-                            background: "rgba(168, 50, 50, 0.9)",
+                            background: "rgba(168, 50, 50, 0.92)",
                             color: "#fff",
-                            fontSize: "11px",
+                            fontSize: "10.5px",
                             padding: "3px 8px",
                             borderRadius: "4px",
-                            fontWeight: "500",
+                            fontWeight: "600",
+                            letterSpacing: "0.04em",
+                            backdropFilter: "blur(4px)",
                           }}
                         >
                           Out of Stock
                         </div>
                       )}
                     </div>
-                    <div style={{ padding: "14px 16px" }}>
-                      <span style={{ fontSize: "11px", color: "var(--blush-strong)", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: "600" }}>
-                        {productForm.type}
+                    <div className="preview-card-content">
+                      <span className="preview-card-cat">
+                        {productForm.type || "Crochet"}
                       </span>
-                      <h4 style={{ fontFamily: "Playfair Display, serif", fontSize: "16px", margin: "4px 0 6px", color: "var(--espresso)" }}>
-                        {productForm.name || "Product Title"}
+                      <h4 className="preview-card-title">
+                        {productForm.name || "Handmade Bouquet"}
                       </h4>
-                      <div style={{ fontWeight: "600", fontSize: "15px", color: "var(--espresso)", marginBottom: "6px" }}>
+                      <div className="preview-card-price">
                         ₹{Number(productForm.price || 0).toLocaleString("en-IN")}
                       </div>
-                      <p style={{ fontSize: "12px", color: "var(--muted)", margin: 0, lineHeight: 1.4, maxHeight: "50px", overflow: "hidden" }}>
-                        {productForm.description || "Handmade sunshine, just for you."}
+                      <p className="preview-card-desc">
+                        {productForm.description || "Handmade sunshine, crafted slowly with care."}
                       </p>
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div className="modal-actions" style={{ marginTop: "24px", borderTop: "1px solid var(--line)", paddingTop: "16px" }}>
+              {/* MODAL ACTIONS BAR */}
+              <div className="modal-actions-bar">
                 <button
                   type="button"
-                  className="secondary-btn"
+                  className="modal-cancel-btn"
                   onClick={() => setShowProductModal(false)}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="admin-login-btn"
-                  style={{ width: "auto", margin: 0, padding: "10px 24px" }}
+                  className="modal-save-btn"
                   disabled={savingProduct}
                 >
-                  {savingProduct ? "Saving to Supabase..." : editingProduct ? "Save Changes" : "Create Product"}
+                  {savingProduct ? (
+                    <>
+                      <RefreshCw size={15} className="spin" />
+                      Saving to Supabase...
+                    </>
+                  ) : editingProduct ? (
+                    <>
+                      <Check size={16} />
+                      Save Changes
+                    </>
+                  ) : (
+                    <>
+                      <Plus size={16} />
+                      Create Product
+                    </>
+                  )}
                 </button>
               </div>
             </form>
@@ -1292,31 +1360,54 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
       {/* DELETE CONFIRMATION MODAL */}
       {deletingProduct && (
         <div className="admin-modal-overlay" onClick={() => setDeletingProduct(null)}>
-          <div className="admin-modal-card" style={{ maxWidth: "440px" }} onClick={(e) => e.stopPropagation()}>
-            <div className="admin-modal-header">
-              <h3 style={{ color: "#a83232" }}>Delete Product</h3>
-              <p>Are you sure you want to permanently delete this product?</p>
+          <div
+            className="admin-delete-modal-card"
+            onClick={(e) => e.stopPropagation()}
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="delete-modal-title"
+          >
+            <div className="delete-modal-icon-circle">
+              <Trash2 size={24} />
             </div>
-            <div style={{ padding: "12px", background: "var(--soft-cream)", borderRadius: "4px", marginBottom: "20px" }}>
-              <strong>{deletingProduct.name}</strong>
-              <div style={{ fontSize: "12px", color: "var(--muted)", marginTop: "4px" }}>
-                Price: ₹{Number(deletingProduct.price).toLocaleString("en-IN")} • Category: {deletingProduct.type}
+
+            <h3 id="delete-modal-title">Delete Product?</h3>
+            <p>
+              Are you sure you want to delete this product? It will be permanently removed from your
+              storefront and Supabase database.
+            </p>
+
+            <div className="delete-product-preview-pill">
+              <img
+                src={resolveProductImage(deletingProduct)}
+                alt={deletingProduct.name}
+                className="delete-product-preview-thumb"
+                onError={(e) => {
+                  e.target.src = sunflowerbouquet;
+                }}
+              />
+              <div className="delete-product-preview-info">
+                <h4 className="delete-product-preview-title">{deletingProduct.name}</h4>
+                <div className="delete-product-preview-meta">
+                  ₹{Number(deletingProduct.price).toLocaleString("en-IN")} • {deletingProduct.type || "Crochet"} • {deletingProduct.stock !== undefined ? deletingProduct.stock : 10} in stock
+                </div>
               </div>
             </div>
-            <div className="modal-actions">
+
+            <div className="delete-modal-actions">
               <button
                 type="button"
-                className="secondary-btn"
+                className="delete-cancel-btn"
                 onClick={() => setDeletingProduct(null)}
               >
-                Cancel
+                Keep Product
               </button>
               <button
                 type="button"
-                className="admin-login-btn"
-                style={{ width: "auto", margin: 0, background: "#a83232", borderColor: "#a83232" }}
+                className="delete-confirm-btn"
                 onClick={confirmDeleteProduct}
               >
+                <Trash2 size={16} />
                 Confirm Delete
               </button>
             </div>
