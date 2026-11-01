@@ -21,8 +21,13 @@ async function verifyHeroAndPwa() {
   for (const vp of viewports) {
     const context = await browser.newContext({ viewport: { width: vp.width, height: vp.height } });
     const page = await context.newPage();
+    await page.addInitScript(() => sessionStorage.setItem("trp_login_dismissed", "true"));
 
     await page.goto("http://localhost:5173/", { waitUntil: "networkidle" });
+
+    // Check whether entire hero section fits in initial viewport without scroll
+    const heroBox = await page.locator(".hero").boundingBox();
+    console.log(`[${vp.name}] Hero box:`, heroBox);
 
     // Check collision between cat-wrapper and primary-btn on desktop
     if (vp.width > 900) {
@@ -42,7 +47,15 @@ async function verifyHeroAndPwa() {
       console.log(`[${vp.name}] Is Overlapping?`, isOverlapping ? "YES (COLLISION)" : "NO (CLEAN CLEARANCE ✓)");
     }
 
-    await page.screenshot({ path: `hero_fix_${vp.name}.png`, fullPage: false });
+    // Capture Slide 1 (Crochet)
+    await page.screenshot({ path: `hero_fix_${vp.name}_slide1.png`, fullPage: false });
+
+    // Click next arrow to switch to Slide 2 (Paintings)
+    await page.locator(".hero-arrow.right").click();
+    await page.waitForTimeout(300);
+
+    // Capture Slide 2 (Paintings)
+    await page.screenshot({ path: `hero_fix_${vp.name}_slide2.png`, fullPage: false });
     await context.close();
   }
 

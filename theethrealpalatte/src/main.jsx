@@ -30,6 +30,7 @@ import "./styles.css";
 import { BUSINESS_CONFIG } from "./config.js";
 import AuthModal from "./components/AuthModal.jsx";
 import AdminDashboard from "./components/AdminDashboard.jsx";
+import { supabase, isSupabaseConfigured } from "./lib/supabase.js";
 
 const ANNOUNCEMENT_MESSAGES = [
   "Handmade with love",
@@ -578,79 +579,187 @@ export default function App() {
     return () => window.removeEventListener("hashchange", handleHash);
   }, []);
 
-  // Products loaded from backend database (with graceful fallback to default catalogue)
+  // Products loaded from Supabase database (with graceful fallback to default catalogue)
   const [productList, setProductList] = useState(products);
 
+  const fetchProductsFromSupabase = async () => {
+    if (!isSupabaseConfigured) return;
+    try {
+      const { data, error } = await supabase
+        .from("products")
+        .select("*")
+        .order("created_at", { ascending: true });
+
+      if (!error && Array.isArray(data) && data.length > 0) {
+        const mapped = data.map((p) => {
+          const id = p.id;
+          let img = p.image || p.imageUrl;
+          if (!img || img === "") {
+            if (p.name.includes("Sunflower Bouquet")) img = sunflowerbouquet;
+            else if (p.name.includes("Flower Keychains")) img = sunflowerkeychain;
+            else if (p.name.includes("Four Leaf Clover")) img = fourleafcloverkeychain;
+            else if (p.name.includes("Butterfly Hairtie")) img = butterflyhairtie;
+            else if (p.name.includes("Bow Clip") || p.name.includes("Bow Hair")) img = bowhairtie;
+            else if (p.name.includes("Blue Dream")) img = bluedreambouquet;
+            else if (p.name.includes("Crimson Lily")) img = crimsonlilybouquet;
+            else if (p.name.includes("Mini Forever")) img = miniforeverbouquet;
+          }
+          return {
+            ...p,
+            id,
+            price: Number(p.price),
+            image: img || sunflowerbouquet,
+            isAvailable: p.is_available !== false,
+          };
+        });
+        setProductList(mapped);
+      }
+    } catch (err) {
+      console.warn("Supabase products fetch notice (using catalog):", err);
+    }
+  };
+
   useEffect(() => {
-    fetch("/api/products")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data && data.success && Array.isArray(data.products) && data.products.length > 0) {
-          const mapped = data.products.map((p) => {
-            const id = p.originalId || p._id;
-            let img = p.image;
-            if (id === 1 || p.name.includes("Sunflower Bouquet")) img = sunflowerbouquet;
-            else if (id === 2 || p.name.includes("Flower Keychains")) img = sunflowerkeychain;
-            else if (id === 3 || p.name.includes("Four Leaf Clover")) img = fourleafcloverkeychain;
-            else if (id === 4 || p.name.includes("Butterfly Hairtie")) img = butterflyhairtie;
-            else if (id === 5 || p.name.includes("Bow Clip")) img = bowhairtie;
-            else if (id === 7 || p.name.includes("Blue Dream")) img = bluedreambouquet;
-            else if (id === 9 || p.name.includes("Crimson Lily")) img = crimsonlilybouquet;
-            else if (id === 10 || p.name.includes("Mini Forever")) img = miniforeverbouquet;
-            return {
-              ...p,
-              id,
-              image: img,
-            };
-          }).filter((p) => p.type !== "Paintings");
-          setProductList(mapped);
-        }
-      })
-      .catch((err) => {
-        console.warn("Backend API not reachable, using offline catalog:", err);
-      });
+    fetchProductsFromSupabase();
   }, []);
 
-  // Verify auth session on load & trigger first-time visitor login popup
-  useEffect(() => {
-    const token = localStorage.getItem("trp_token");
-    if (token) {
-      fetch("/api/auth/me", {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-        .then((r) => r.json())
-        .then((data) => {
-          if (data && data.success) {
-            setCurrentUser(data.user);
-            localStorage.setItem("trp_user", JSON.stringify(data.user));
-            // Sync cart from backend
-            fetch("/api/cart", {
-              headers: { Authorization: `Bearer ${token}` },
-            })
-              .then((cRes) => cRes.json())
-              .then((cData) => {
-                if (cData && cData.success && Array.isArray(cData.cart) && cData.cart.length > 0) {
-                  setCart(cData.cart);
-                }
-              })
-              .catch(() => { });
-          } else {
-            localStorage.removeItem("trp_token");
-            localStorage.removeItem("trp_user");
-            setCurrentUser(null);
-          }
-        })
-        .catch(() => { });
-    } else {
-      const dismissed = sessionStorage.getItem("trp_login_dismissed");
-      if (!dismissed) {
-        const timer = setTimeout(() => {
-          setShowAuthModal(true);
-        }, 800);
-        return () => clearTimeout(timer);
+  // Sync a single cart item to Supabase PostgreSQL database
+  const syncCartItemToSupabase = async (userId, prodId, quantity) => {
+    if (!isSupabaseConfigured || !userId) return;
+    try {
+      if (quantity <= 0) {
+        await supabase
+          .from("cart_items")
+          .delete()
+          .eq("user_id", userId)
+          .eq("product_id", String(prodId));
+      } else {
+        await supabase
+          .from("cart_items")
+          .upsert(
+            {
+              user_id: userId,
+              product_id: String(prodId),
+              quantity: quantity,
+            },
+            { onConflict: "user_id,product_id" }
+          );
       }
+    } catch (err) {
+      console.warn("Supabase cart_items sync warning:", err);
     }
-  }, []);
+  };
+
+  // Fetch cart items from Supabase and hydrate using trusted local product catalogue
+  const fetchUserCartFromSupabase = async (userId) => {
+    if (!isSupabaseConfigured || !userId) return;
+    try {
+      const { data, error } = await supabase
+        .from("cart_items")
+        .select("product_id, quantity")
+        .eq("user_id", userId);
+
+      if (error) {
+        console.warn("Supabase cart_items fetch warning:", error);
+        return;
+      }
+
+      if (data && Array.isArray(data)) {
+        setCart((currentCart) => {
+          // Hydrate cloud items using trusted catalogue prices & images
+          const cloudItems = data
+            .map((row) => {
+              const prod = productList.find(
+                (p) => String(p.id || p._id) === String(row.product_id)
+              );
+              if (!prod) return null;
+              return {
+                ...prod,
+                id: prod.id || prod._id,
+                quantity: Math.max(1, row.quantity),
+              };
+            })
+            .filter(Boolean);
+
+          // Safe guest cart merge: upload any items previously in guest cart
+          currentCart.forEach((guestItem) => {
+            const gId = String(guestItem.id || guestItem.productId || guestItem._id);
+            const existsInCloud = cloudItems.find(
+              (c) => String(c.id || c.productId || c._id) === gId
+            );
+            if (!existsInCloud) {
+              cloudItems.push(guestItem);
+              syncCartItemToSupabase(userId, gId, guestItem.quantity);
+            }
+          });
+
+          return cloudItems;
+        });
+      }
+    } catch (err) {
+      console.warn("Failed to load user cart from Supabase:", err);
+    }
+  };
+
+  // Verify auth session on load & listen for real-time Supabase auth state changes
+  useEffect(() => {
+    let isMounted = true;
+
+    if (isSupabaseConfigured) {
+      // 1. Check existing session
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (!isMounted) return;
+        if (session?.user) {
+          const userObj = {
+            id: session.user.id,
+            email: session.user.email,
+            name:
+              session.user.user_metadata?.full_name ||
+              session.user.user_metadata?.name ||
+              session.user.email.split("@")[0],
+            phone: session.user.user_metadata?.phone || "",
+          };
+          setCurrentUser(userObj);
+          localStorage.setItem("trp_user", JSON.stringify(userObj));
+          fetchUserCartFromSupabase(session.user.id);
+        } else {
+          setCurrentUser(null);
+          localStorage.removeItem("trp_user");
+        }
+      });
+
+      // 2. Listen for auth changes (login, logout, token refresh)
+      const {
+        data: { subscription },
+      } = supabase.auth.onAuthStateChange(async (event, session) => {
+        if (!isMounted) return;
+        if (event === "SIGNED_IN" && session?.user) {
+          const userObj = {
+            id: session.user.id,
+            email: session.user.email,
+            name:
+              session.user.user_metadata?.full_name ||
+              session.user.user_metadata?.name ||
+              session.user.email.split("@")[0],
+            phone: session.user.user_metadata?.phone || "",
+          };
+          setCurrentUser(userObj);
+          localStorage.setItem("trp_user", JSON.stringify(userObj));
+          fetchUserCartFromSupabase(session.user.id);
+        } else if (event === "SIGNED_OUT") {
+          setCurrentUser(null);
+          localStorage.removeItem("trp_user");
+          localStorage.removeItem("trp_cart");
+          setCart([]);
+        }
+      });
+
+      return () => {
+        isMounted = false;
+        subscription?.unsubscribe();
+      };
+    }
+  }, [productList]);
 
   // PWA Installation Prompt State
   const [deferredPrompt, setDeferredPrompt] = useState(null);
@@ -700,17 +809,7 @@ export default function App() {
   }, [cart]);
 
   const syncBackendCart = (cartItems) => {
-    const token = localStorage.getItem("trp_token");
-    if (token) {
-      fetch("/api/cart", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ items: cartItems }),
-      }).catch(() => { });
-    }
+    // Handled directly via syncCartItemToSupabase for granular PostgreSQL reliability
   };
 
   // Wishlist State (Persisted in localStorage)
@@ -791,16 +890,21 @@ export default function App() {
     setCart((currentCart) => {
       const existing = currentCart.find((item) => (item.id || item.productId || item._id) === prodId);
       let updated;
+      let newQty = quantity;
       if (existing) {
+        newQty = existing.quantity + quantity;
         updated = currentCart.map((item) =>
           (item.id || item.productId || item._id) === prodId
-            ? { ...item, quantity: item.quantity + quantity }
+            ? { ...item, quantity: newQty }
             : item
         );
       } else {
-        updated = [...currentCart, { ...product, id: prodId, quantity }];
+        updated = [...currentCart, { ...product, id: prodId, quantity: newQty }];
       }
-      syncBackendCart(updated);
+
+      if (currentUser?.id) {
+        syncCartItemToSupabase(currentUser.id, prodId, newQty);
+      }
       return updated;
     });
     showPopup("Added to your cart ♡");
@@ -820,26 +924,38 @@ export default function App() {
 
   const increaseQuantity = (id) => {
     setCart((currentCart) => {
-      const updated = currentCart.map((item) =>
-        (item.id || item.productId || item._id) === id
-          ? { ...item, quantity: item.quantity + 1 }
-          : item
-      );
-      syncBackendCart(updated);
+      let nextQty = 1;
+      const updated = currentCart.map((item) => {
+        if ((item.id || item.productId || item._id) === id) {
+          nextQty = item.quantity + 1;
+          return { ...item, quantity: nextQty };
+        }
+        return item;
+      });
+
+      if (currentUser?.id) {
+        syncCartItemToSupabase(currentUser.id, id, nextQty);
+      }
       return updated;
     });
   };
 
   const decreaseQuantity = (id) => {
     setCart((currentCart) => {
+      let nextQty = 0;
       const updated = currentCart
-        .map((item) =>
-          (item.id || item.productId || item._id) === id
-            ? { ...item, quantity: item.quantity - 1 }
-            : item
-        )
+        .map((item) => {
+          if ((item.id || item.productId || item._id) === id) {
+            nextQty = item.quantity - 1;
+            return { ...item, quantity: nextQty };
+          }
+          return item;
+        })
         .filter((item) => item.quantity > 0);
-      syncBackendCart(updated);
+
+      if (currentUser?.id) {
+        syncCartItemToSupabase(currentUser.id, id, nextQty);
+      }
       return updated;
     });
   };
@@ -849,44 +965,46 @@ export default function App() {
       const updated = currentCart.filter(
         (item) => (item.id || item.productId || item._id) !== id
       );
-      syncBackendCart(updated);
+
+      if (currentUser?.id) {
+        syncCartItemToSupabase(currentUser.id, id, 0);
+      }
       return updated;
     });
   };
 
-  const cartCount = cart.reduce((total, item) => total + item.quantity, 0);
+  const cartCount = cart.reduce((total, item) => total + (Number(item?.quantity) || 0), 0);
 
-  const cartTotal = cart.reduce(
-    (total, item) => total + item.price * item.quantity,
-    0
-  );
+  // Dynamically compute cart total using live catalogue prices where available, with deleted product safety
+  const cartTotal = cart.reduce((total, item) => {
+    if (!item) return total;
+    const itemId = String(item.id || item.productId || item._id);
+    const catalogProduct = productList.find((p) => String(p.id || p._id) === itemId);
+    const unitPrice = catalogProduct ? Number(catalogProduct.price) : (Number(item.price) || 0);
+    const validPrice = isNaN(unitPrice) ? 0 : unitPrice;
+    const qty = Math.max(1, Number(item.quantity) || 1);
+    return total + validPrice * qty;
+  }, 0);
 
   const orderSingleOnWhatsApp = (product, quantity = 1) => {
     if (!product) return;
-
-    // Record enquiry in backend
-    const token = localStorage.getItem("trp_token");
-    fetch("/api/orders", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify({
-        customerName: currentUser ? currentUser.name : "WhatsApp Customer",
-        customerEmail: currentUser ? currentUser.email : "whatsapp.enquiry@theethrealpalatte.com",
-        customerPhone: currentUser ? currentUser.phone || "+91 8088645598" : "+91 8088645598",
-        items: [{ ...product, quantity }],
-        orderType: "whatsapp_enquiry",
-      }),
-    }).catch(() => { });
+    const prodId = String(product.id || product._id);
+    const catalogProduct = productList.find((p) => String(p.id || p._id) === prodId) || product;
+    const prodName = catalogProduct.name || product.name || "Handcrafted Piece";
+    const unitPrice = Number(catalogProduct.price ?? product.price) || 0;
+    const qty = Math.max(1, Number(quantity) || 1);
+    const priceText = qty > 1 ? `₹${unitPrice.toLocaleString("en-IN")} each` : `₹${unitPrice.toLocaleString("en-IN")}`;
+    const total = unitPrice * qty;
 
     const message =
-      `Hi! I'd like to order:\n\n` +
-      `Product: ${product.name}\n` +
-      `Price: ₹${product.price.toLocaleString("en-IN")}\n` +
-      `Quantity: ${quantity}\n\n` +
-      `Please let me know how I can proceed with the order. Thank you! ♡`;
+      `Hello Theethrealpalatte!\n\n` +
+      `I would like to enquire about this product:\n\n` +
+      `1. ${prodName}\n` +
+      `   Quantity: ${qty}\n` +
+      `   Price: ${priceText}\n\n` +
+      `Estimated total: ₹${total.toLocaleString("en-IN")}\n\n` +
+      `Please let me know the availability and further details.\n\n` +
+      `Thank you!`;
 
     const whatsappUrl = `https://wa.me/${BUSINESS_CONFIG.whatsappNumber}?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, "_blank", "noopener,noreferrer");
@@ -895,36 +1013,23 @@ export default function App() {
   const orderCartOnWhatsApp = () => {
     if (cart.length === 0) return;
 
-    // Record enquiry in backend
-    const token = localStorage.getItem("trp_token");
-    fetch("/api/orders", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify({
-        customerName: currentUser ? currentUser.name : "WhatsApp Customer",
-        customerEmail: currentUser ? currentUser.email : "whatsapp.enquiry@theethrealpalatte.com",
-        customerPhone: currentUser ? currentUser.phone || "+91 8088645598" : "+91 8088645598",
-        items: cart,
-        orderType: "whatsapp_enquiry",
-      }),
-    }).catch(() => { });
+    let message = `Hello Theethrealpalatte!\n\nI would like to enquire about these products:\n\n`;
 
-    let message =
-      `Hello Theethrealpalatte! 🌷\n\n` +
-      `I would like to place an order:\n\n`;
-
-    cart.forEach((item) => {
-      message += `${item.name} × ${item.quantity} — ₹${(
-        item.price * item.quantity
-      ).toLocaleString("en-IN")}\n`;
+    cart.forEach((item, index) => {
+      if (!item) return;
+      const itemId = String(item.id || item.productId || item._id);
+      const catalogProduct = productList.find((p) => String(p.id || p._id) === itemId);
+      const prodName = catalogProduct?.name || item.name || "Handcrafted Piece";
+      const unitPrice = catalogProduct ? Number(catalogProduct.price) : (Number(item.price) || 0);
+      const qty = Math.max(1, Number(item.quantity) || 1);
+      const priceText = qty > 1 ? `₹${unitPrice.toLocaleString("en-IN")} each` : `₹${unitPrice.toLocaleString("en-IN")}`;
+      message += `${index + 1}. ${prodName}\n   Quantity: ${qty}\n   Price: ${priceText}\n\n`;
     });
 
     message +=
-      `\nTotal: ₹${cartTotal.toLocaleString("en-IN")}\n\n` +
-      `Please let me know the next steps. Thank you! 🤍`;
+      `Estimated total: ₹${cartTotal.toLocaleString("en-IN")}\n\n` +
+      `Please let me know the availability and further details.\n\n` +
+      `Thank you!`;
 
     const whatsappURL = `https://wa.me/${BUSINESS_CONFIG.whatsappNumber}?text=${encodeURIComponent(message)}`;
     window.open(whatsappURL, "_blank", "noopener,noreferrer");
@@ -937,7 +1042,10 @@ export default function App() {
         onBackToStore={() => {
           setIsAdminView(false);
           window.location.hash = "";
+          fetchProductsFromSupabase();
         }}
+        onProductsUpdated={fetchProductsFromSupabase}
+        initialProducts={productList}
       />
     );
   }
@@ -1699,47 +1807,59 @@ export default function App() {
             ) : (
               <>
                 <div className="cart-items-scroll">
-                  {cart.map((item) => (
-                    <div className="cart-item" key={item.id}>
-                      <img
-                        src={item.image}
-                        alt={item.name}
-                        onClick={() => {
-                          setShowCart(false);
-                          openProductDetail(item);
-                        }}
-                      />
-                      <div className="cart-item-info">
-                        <h3
+                  {cart.map((item) => {
+                    if (!item) return null;
+                    const itemId = item.id || item.productId || item._id;
+                    const catalogProduct = productList.find(
+                      (p) => String(p.id || p._id) === String(itemId)
+                    );
+                    const prodName = catalogProduct?.name || item.name || "Handcrafted Piece";
+                    const unitPrice = catalogProduct ? Number(catalogProduct.price) : (Number(item.price) || 0);
+                    const itemImage = catalogProduct?.image || item.image || sunflowerbouquet;
+                    const qty = Math.max(1, Number(item.quantity) || 1);
+
+                    return (
+                      <div className="cart-item" key={itemId}>
+                        <img
+                          src={itemImage}
+                          alt={prodName}
                           onClick={() => {
                             setShowCart(false);
-                            openProductDetail(item);
+                            if (catalogProduct) openProductDetail(catalogProduct);
                           }}
-                        >
-                          {item.name}
-                        </h3>
-                        <p>
-                          ₹{(item.price * item.quantity).toLocaleString("en-IN")}
-                        </p>
-                        <div className="quantity-controls">
-                          <button onClick={() => decreaseQuantity(item.id)}>
-                            −
-                          </button>
-                          <span>{item.quantity}</span>
-                          <button onClick={() => increaseQuantity(item.id)}>
-                            +
-                          </button>
+                        />
+                        <div className="cart-item-info">
+                          <h3
+                            onClick={() => {
+                              setShowCart(false);
+                              if (catalogProduct) openProductDetail(catalogProduct);
+                            }}
+                          >
+                            {prodName}
+                          </h3>
+                          <p>
+                            ₹{(unitPrice * qty).toLocaleString("en-IN")}
+                          </p>
+                          <div className="quantity-controls">
+                            <button onClick={() => decreaseQuantity(itemId)}>
+                              −
+                            </button>
+                            <span>{qty}</span>
+                            <button onClick={() => increaseQuantity(itemId)}>
+                              +
+                            </button>
+                          </div>
                         </div>
+                        <button
+                          className="item-remove-btn"
+                          onClick={() => removeFromCart(itemId)}
+                          aria-label="Remove item"
+                        >
+                          Remove
+                        </button>
                       </div>
-                      <button
-                        className="item-remove-btn"
-                        onClick={() => removeFromCart(item.id)}
-                        aria-label="Remove item"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 <div className="cart-footer">
@@ -1919,10 +2039,19 @@ export default function App() {
               {currentUser ? (
                 <button
                   style={{ color: "#9b1c1c", marginTop: "12px", borderTop: "1px solid var(--line)", paddingTop: "14px" }}
-                  onClick={() => {
+                  onClick={async () => {
+                    if (isSupabaseConfigured) {
+                      try {
+                        await supabase.auth.signOut();
+                      } catch (err) {
+                        console.warn("Supabase sign out error:", err);
+                      }
+                    }
                     localStorage.removeItem("trp_token");
                     localStorage.removeItem("trp_user");
+                    localStorage.removeItem("trp_cart");
                     setCurrentUser(null);
+                    setCart([]);
                     setShowAccountModal(false);
                     showPopup("Logged out successfully");
                   }}
@@ -1958,6 +2087,7 @@ export default function App() {
         }}
         onAuthSuccess={(user, token) => {
           setCurrentUser(user);
+          setShowAuthModal(false);
           showPopup(`Welcome, ${user.name}! 🌸`);
           if (pendingCartAction) {
             executeAddToCart(pendingCartAction.product, pendingCartAction.quantity);

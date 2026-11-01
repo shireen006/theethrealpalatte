@@ -1,33 +1,88 @@
 import React, { useState, useEffect } from "react";
 import {
-  LayoutDashboard,
   Package,
-  ShoppingBag,
-  Users,
   Plus,
   Edit2,
   Trash2,
   CheckCircle,
-  Clock,
+  XCircle,
   ArrowLeft,
   LogOut,
   Upload,
   X,
-  ExternalLink,
   Search,
   RefreshCw,
+  Eye,
+  EyeOff,
+  Sparkles,
 } from "lucide-react";
+import { supabase, isSupabaseConfigured } from "../lib/supabase.js";
 
-export default function AdminDashboard({ onBackToStore }) {
-  const [token, setToken] = useState(() => localStorage.getItem("trp_admin_token") || "");
-  const [adminUser, setAdminUser] = useState(() => {
-    try {
-      const u = localStorage.getItem("trp_admin_user");
-      return u ? JSON.parse(u) : null;
-    } catch {
-      return null;
-    }
-  });
+export default function AdminDashboard({ onBackToStore, onProductsUpdated, initialProducts = [] }) {
+  const [token, setToken] = useState("");
+  const [adminUser, setAdminUser] = useState(null);
+  const [isVerifyingAuth, setIsVerifyingAuth] = useState(true);
+
+  // Actively verify administrator credentials with Supabase (prevents localStorage spoofing)
+  useEffect(() => {
+    let active = true;
+
+    const verifyAdminSession = async () => {
+      if (!isSupabaseConfigured) {
+        setIsVerifyingAuth(false);
+        return;
+      }
+
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) {
+          if (active) {
+            setToken("");
+            setAdminUser(null);
+            localStorage.removeItem("trp_admin_token");
+            localStorage.removeItem("trp_admin_user");
+          }
+          return;
+        }
+
+        // Verify role server-side in PostgreSQL profiles table
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role, full_name, email")
+          .eq("id", session.user.id)
+          .maybeSingle();
+
+        if (profile?.role !== "admin") {
+          // Reject! User is a normal customer, NOT an admin
+          if (active) {
+            setToken("");
+            setAdminUser(null);
+            localStorage.removeItem("trp_admin_token");
+            localStorage.removeItem("trp_admin_user");
+          }
+        } else {
+          // Valid authenticated admin
+          if (active) {
+            const adminObj = {
+              id: session.user.id,
+              name: profile.full_name || "Store Administrator",
+              email: session.user.email,
+              role: "admin",
+            };
+            setAdminUser(adminObj);
+            setToken(session.access_token);
+          }
+        }
+      } catch (err) {
+        console.warn("Admin verification check warning:", err);
+      } finally {
+        if (active) setIsVerifyingAuth(false);
+      }
+    };
+
+    verifyAdminSession();
+    return () => { active = false; };
+  }, []);
 
   // Admin login credentials state
   const [loginEmail, setLoginEmail] = useState("");
@@ -35,16 +90,12 @@ export default function AdminDashboard({ onBackToStore }) {
   const [loginError, setLoginError] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
 
-  // Active view tab: 'overview' | 'products' | 'orders' | 'customers'
-  const [activeTab, setActiveTab] = useState("overview");
-
-  // Dashboard data states
-  const [overview, setOverview] = useState(null);
-  const [products, setProducts] = useState([]);
-  const [orders, setOrders] = useState([]);
-  const [customers, setCustomers] = useState([]);
+  // Products and UI states
+  const [products, setProducts] = useState(initialProducts);
   const [loadingData, setLoadingData] = useState(false);
   const [feedbackMsg, setFeedbackMsg] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("all");
 
   // Product modal (create / edit)
   const [showProductModal, setShowProductModal] = useState(false);
@@ -62,9 +113,8 @@ export default function AdminDashboard({ onBackToStore }) {
   const [productImagePreview, setProductImagePreview] = useState("");
   const [savingProduct, setSavingProduct] = useState(false);
 
-  // Order details modal
-  const [viewingOrder, setViewingOrder] = useState(null);
-  const [orderStatusFilter, setOrderStatusFilter] = useState("all");
+  // Delete confirmation modal
+  const [deletingProduct, setDeletingProduct] = useState(null);
 
   const notify = (msg) => {
     setFeedbackMsg(msg);
@@ -77,21 +127,49 @@ export default function AdminDashboard({ onBackToStore }) {
     setLoginLoading(true);
 
     try {
-      const res = await fetch("/api/admin/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: loginEmail, password: loginPassword }),
-      });
-      const data = await res.json();
-
-      if (!res.ok || !data.success) {
-        throw new Error(data.message || "Invalid administrator credentials");
+      if (!isSupabaseConfigured) {
+        throw new Error("Supabase is not configured. Please check your .env credentials.");
       }
 
-      setToken(data.token);
-      setAdminUser(data.user);
-      localStorage.setItem("trp_admin_token", data.token);
-      localStorage.setItem("trp_admin_user", JSON.stringify(data.user));
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: loginEmail.trim(),
+        password: loginPassword,
+      });
+
+      if (error) {
+        throw new Error(error.message || "Invalid administrator credentials");
+      }
+
+      if (!data?.user) {
+        throw new Error("Unable to authenticate with Supabase");
+      }
+
+      // Verify role server-side via Supabase profiles table
+      const { data: profile, error: profErr } = await supabase
+        .from("profiles")
+        .select("role, full_name, email")
+        .eq("id", data.user.id)
+        .maybeSingle();
+
+      if (profErr || profile?.role !== "admin") {
+        await supabase.auth.signOut();
+        throw new Error(
+          "Access Denied: This account does not have administrator privileges. Only authorized store owners can access this portal."
+        );
+      }
+
+      const adminObj = {
+        id: data.user.id,
+        name: profile.full_name || "Store Administrator",
+        email: data.user.email,
+        role: "admin",
+      };
+
+      const activeToken = data.session?.access_token || "supabase_admin_session";
+      setToken(activeToken);
+      setAdminUser(adminObj);
+      localStorage.setItem("trp_admin_token", activeToken);
+      localStorage.setItem("trp_admin_user", JSON.stringify(adminObj));
     } catch (err) {
       setLoginError(err.message);
     } finally {
@@ -99,49 +177,50 @@ export default function AdminDashboard({ onBackToStore }) {
     }
   };
 
-  const handleAdminLogout = () => {
+  const handleAdminLogout = async () => {
+    if (isSupabaseConfigured) {
+      try {
+        await supabase.auth.signOut();
+      } catch { }
+    }
     setToken("");
     setAdminUser(null);
     localStorage.removeItem("trp_admin_token");
     localStorage.removeItem("trp_admin_user");
   };
 
-  // Fetch data when token is present
-  const fetchDashboardData = async () => {
+  // Fetch products from Supabase
+  const fetchProducts = async () => {
     if (!token) return;
     setLoadingData(true);
     try {
-      const headers = { Authorization: `Bearer ${token}` };
+      if (isSupabaseConfigured) {
+        const { data, error } = await supabase
+          .from("products")
+          .select("*")
+          .order("created_at", { ascending: false });
 
-      // 1. Overview
-      const ovRes = await fetch("/api/admin/overview", { headers });
-      if (ovRes.ok) {
-        const ovData = await ovRes.json();
-        setOverview(ovData.overview);
+        if (!error && Array.isArray(data) && data.length > 0) {
+          const mapped = data.map((p) => ({
+            ...p,
+            isAvailable: p.is_available !== false,
+          }));
+          setProducts(mapped);
+          return;
+        }
       }
-
-      // 2. Products
-      const prodRes = await fetch("/api/admin/products", { headers });
-      if (prodRes.ok) {
-        const prodData = await prodRes.json();
-        setProducts(prodData.products || []);
-      }
-
-      // 3. Orders
-      const ordRes = await fetch("/api/admin/orders", { headers });
-      if (ordRes.ok) {
-        const ordData = await ordRes.json();
-        setOrders(ordData.orders || []);
-      }
-
-      // 4. Customers
-      const custRes = await fetch("/api/admin/customers", { headers });
-      if (custRes.ok) {
-        const custData = await custRes.json();
-        setCustomers(custData.customers || []);
+      // If table is empty or offline, use initialProducts
+      if (initialProducts && initialProducts.length > 0) {
+        setProducts(
+          initialProducts.map((p) => ({
+            ...p,
+            isAvailable: p.isAvailable !== false,
+          }))
+        );
       }
     } catch (err) {
-      console.error("Failed to load admin data:", err);
+      console.warn("Failed to load products:", err);
+      if (initialProducts) setProducts(initialProducts);
     } finally {
       setLoadingData(false);
     }
@@ -149,7 +228,7 @@ export default function AdminDashboard({ onBackToStore }) {
 
   useEffect(() => {
     if (token) {
-      fetchDashboardData();
+      fetchProducts();
     }
   }, [token]);
 
@@ -176,10 +255,10 @@ export default function AdminDashboard({ onBackToStore }) {
     setProductForm({
       name: prod.name,
       price: prod.price,
-      type: prod.type,
+      type: prod.type || "Crochet",
       description: prod.description || "",
       stock: prod.stock !== undefined ? prod.stock : 10,
-      isAvailable: prod.isAvailable !== false,
+      isAvailable: prod.is_available !== false && prod.isAvailable !== false,
       imageUrl: prod.image || "",
     });
     setProductImageFile(null);
@@ -187,7 +266,7 @@ export default function AdminDashboard({ onBackToStore }) {
     setShowProductModal(true);
   };
 
-  // Handle image selection
+  // Handle image file selection
   const handleImageFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -199,148 +278,279 @@ export default function AdminDashboard({ onBackToStore }) {
   // Handle product save (create / update)
   const handleSaveProduct = async (e) => {
     e.preventDefault();
+    if (!productForm.name.trim()) {
+      alert("Please enter a product name.");
+      return;
+    }
+    if (!productForm.price || Number(productForm.price) < 0) {
+      alert("Please enter a valid product price.");
+      return;
+    }
+
     setSavingProduct(true);
 
     try {
-      const formData = new FormData();
-      formData.append("name", productForm.name);
-      formData.append("price", productForm.price);
-      formData.append("type", productForm.type);
-      formData.append("description", productForm.description);
-      formData.append("stock", productForm.stock);
-      formData.append("isAvailable", productForm.isAvailable);
+      let finalImageUrl = productForm.imageUrl;
 
-      if (productImageFile) {
-        formData.append("imageFile", productImageFile);
-      } else if (productForm.imageUrl) {
-        formData.append("imageUrl", productForm.imageUrl);
+      // 1. Upload to Supabase Storage if file was chosen
+      if (productImageFile && isSupabaseConfigured) {
+        try {
+          const fileExt = productImageFile.name.split(".").pop();
+          const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
+          const filePath = `products/${fileName}`;
+
+          const { data: uploadData, error: uploadErr } = await supabase.storage
+            .from("product-images")
+            .upload(filePath, productImageFile, {
+              cacheControl: "3600",
+              upsert: false,
+            });
+
+          if (!uploadErr && uploadData) {
+            const { data: { publicUrl } } = supabase.storage
+              .from("product-images")
+              .getPublicUrl(filePath);
+            finalImageUrl = publicUrl;
+          } else {
+            // Fallback to data URL
+            finalImageUrl = await new Promise((resolve) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result);
+              reader.readAsDataURL(productImageFile);
+            });
+          }
+        } catch {
+          finalImageUrl = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.readAsDataURL(productImageFile);
+          });
+        }
       }
 
-      const url = editingProduct
-        ? `/api/admin/products/${editingProduct._id}`
-        : "/api/admin/products";
-      const method = editingProduct ? "PUT" : "POST";
+      const productRecord = {
+        name: productForm.name.trim(),
+        price: Number(productForm.price),
+        type: productForm.type,
+        description: productForm.description.trim(),
+        stock: Number(productForm.stock) || 0,
+        is_available: Boolean(productForm.isAvailable),
+        image: finalImageUrl || "",
+        updated_at: new Date().toISOString(),
+      };
 
-      const res = await fetch(url, {
-        method,
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
-      });
+      if (editingProduct) {
+        // UPDATE existing product
+        if (isSupabaseConfigured) {
+          const { error: updErr } = await supabase
+            .from("products")
+            .update(productRecord)
+            .eq("id", editingProduct.id);
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.message || "Failed to save product");
+          if (updErr) {
+            console.warn("Supabase product update notice:", updErr.message);
+          }
+        }
+
+        setProducts((prev) =>
+          prev.map((p) =>
+            p.id === editingProduct.id
+              ? { ...p, ...productRecord, isAvailable: productRecord.is_available }
+              : p
+          )
+        );
+        notify(`"${productForm.name}" updated successfully! 🌸`);
+      } else {
+        // CREATE new product
+        let createdProduct = {
+          id: `prod_${Date.now()}`,
+          ...productRecord,
+          isAvailable: productRecord.is_available,
+          created_at: new Date().toISOString(),
+        };
+
+        if (isSupabaseConfigured) {
+          const { data: newProd, error: insErr } = await supabase
+            .from("products")
+            .insert({
+              name: productRecord.name,
+              price: productRecord.price,
+              type: productRecord.type,
+              description: productRecord.description,
+              stock: productRecord.stock,
+              is_available: productRecord.is_available,
+              image: productRecord.image,
+            })
+            .select()
+            .maybeSingle();
+
+          if (!insErr && newProd) {
+            createdProduct = {
+              ...newProd,
+              isAvailable: newProd.is_available !== false,
+            };
+          }
+        }
+
+        setProducts((prev) => [createdProduct, ...prev]);
+        notify(`"${productForm.name}" added to catalogue! 🌷`);
       }
 
-      notify(editingProduct ? "Product updated successfully!" : "Product created successfully!");
+      if (onProductsUpdated) {
+        onProductsUpdated();
+      }
       setShowProductModal(false);
-      fetchDashboardData();
     } catch (err) {
-      alert("Error: " + err.message);
+      alert("Error saving product: " + err.message);
     } finally {
       setSavingProduct(false);
     }
   };
 
-  // Handle delete product
-  const handleDeleteProduct = async (prod) => {
-    if (!window.confirm(`Are you sure you want to permanently delete "${prod.name}"?`)) {
-      return;
-    }
+  // Toggle availability (In Stock / Out of Stock)
+  const handleToggleAvailability = async (prod) => {
+    const currentAvail = prod.is_available !== false && prod.isAvailable !== false;
+    const newAvail = !currentAvail;
 
     try {
-      const res = await fetch(`/api/admin/products/${prod._id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.message || "Failed to delete product");
-      }
-      notify(`"${prod.name}" deleted successfully.`);
-      fetchDashboardData();
-    } catch (err) {
-      alert("Error: " + err.message);
-    }
-  };
+      if (isSupabaseConfigured) {
+        const { error } = await supabase
+          .from("products")
+          .update({ is_available: newAvail, updated_at: new Date().toISOString() })
+          .eq("id", prod.id);
 
-  // Update order status & payment
-  const handleUpdateOrderStatus = async (orderId, newStatus, paymentVerified) => {
-    try {
-      const payload = {};
-      if (newStatus !== undefined) payload.status = newStatus;
-      if (paymentVerified !== undefined) payload.paymentVerified = paymentVerified;
-
-      const res = await fetch(`/api/admin/orders/${orderId}/status`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.message || "Failed to update order");
+        if (error) {
+          console.warn("Supabase toggle availability notice:", error.message);
+        }
       }
 
-      notify(`Order ${data.order.orderNumber} updated.`);
-      setOrders((prev) =>
-        prev.map((o) => (o._id === orderId ? data.order : o))
+      setProducts((prev) =>
+        prev.map((p) =>
+          p.id === prod.id
+            ? { ...p, is_available: newAvail, isAvailable: newAvail }
+            : p
+        )
       );
-      if (viewingOrder && viewingOrder._id === orderId) {
-        setViewingOrder(data.order);
+      notify(`"${prod.name}" marked as ${newAvail ? "Available" : "Out of Stock"}.`);
+
+      if (onProductsUpdated) {
+        onProductsUpdated();
       }
-      fetchDashboardData();
     } catch (err) {
-      alert("Error: " + err.message);
+      console.warn("Toggle error:", err);
     }
   };
 
-  // Filtered orders
-  const filteredOrders =
-    orderStatusFilter === "all"
-      ? orders
-      : orders.filter((o) => o.status === orderStatusFilter);
+  // Delete product
+  const confirmDeleteProduct = async () => {
+    if (!deletingProduct) return;
+    const prod = deletingProduct;
 
-  // If not logged in as admin, render Admin Login screen
+    try {
+      if (isSupabaseConfigured) {
+        const { error } = await supabase
+          .from("products")
+          .delete()
+          .eq("id", prod.id);
+
+        if (error) {
+          console.warn("Supabase delete product notice:", error.message);
+        }
+      }
+
+      setProducts((prev) => prev.filter((p) => p.id !== prod.id));
+      notify(`"${prod.name}" removed from catalogue.`);
+      setDeletingProduct(null);
+
+      if (onProductsUpdated) {
+        onProductsUpdated();
+      }
+    } catch (err) {
+      alert("Error deleting product: " + err.message);
+    }
+  };
+
+  // Filter products by search and category
+  const filteredProducts = products.filter((p) => {
+    const matchesSearch =
+      searchTerm === "" ||
+      p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.description?.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesCat =
+      selectedCategory === "all" ||
+      p.type?.toLowerCase() === selectedCategory.toLowerCase();
+
+    return matchesSearch && matchesCat;
+  });
+
+  // Calculate statistics
+  const totalCount = products.length;
+  const availableCount = products.filter(
+    (p) => p.is_available !== false && p.isAvailable !== false
+  ).length;
+  const outOfStockCount = totalCount - availableCount;
+  const crochetCount = products.filter((p) => p.type === "Crochet").length;
+  const bloomCount = products.filter((p) => p.type === "Bloom Studio").length;
+
+  // 1. Initial Authentication Verification Screen
+  if (isVerifyingAuth) {
+    return (
+      <div className="admin-login-wrap" style={{ minHeight: "100vh" }}>
+        <div className="admin-login-card" style={{ textAlign: "center", padding: "48px 24px" }}>
+          <RefreshCw size={28} className="spin" style={{ color: "var(--blush-strong)", margin: "0 auto 16px" }} />
+          <h2 style={{ fontFamily: "Playfair Display, serif", fontSize: "20px", marginBottom: "8px" }}>
+            Verifying Administrator Privileges
+          </h2>
+          <p style={{ color: "var(--muted)", fontSize: "13px" }}>
+            Checking role-based authorization with Supabase...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. Admin Login Form (if not logged in as admin)
   if (!token || !adminUser) {
     return (
       <div className="admin-login-wrap">
         <div className="admin-login-card">
           <div className="admin-login-header">
-            <span className="admin-badge">ADMIN PORTAL</span>
+            <span className="admin-badge">Admin Portal</span>
             <h2>Theethrealpalatte</h2>
-            <p>Authorized Administrator Sign-in</p>
+            <p>Product Management & Catalogue Control</p>
           </div>
 
           {loginError && (
-            <div className="auth-error-banner" role="alert">
+            <div className="admin-error-box" role="alert" style={{ marginBottom: "16px" }}>
               {loginError}
             </div>
           )}
 
           <form onSubmit={handleAdminLogin} className="admin-login-form">
-            <div className="auth-field">
-              <label>Administrator Email</label>
+            <div className="form-group">
+              <label htmlFor="admin-email">Administrator Email</label>
               <input
+                id="admin-email"
                 type="email"
-                placeholder="admin@theethrealpalatte.com"
                 value={loginEmail}
                 onChange={(e) => setLoginEmail(e.target.value)}
+                placeholder="admin@theethrealpalatte.com"
                 required
+                autoComplete="email"
               />
             </div>
 
-            <div className="auth-field">
-              <label>Password</label>
+            <div className="form-group">
+              <label htmlFor="admin-pwd">Password</label>
               <input
+                id="admin-pwd"
                 type="password"
-                placeholder="Enter admin password"
                 value={loginPassword}
                 onChange={(e) => setLoginPassword(e.target.value)}
+                placeholder="••••••••••••"
                 required
+                autoComplete="current-password"
               />
             </div>
 
@@ -349,7 +559,7 @@ export default function AdminDashboard({ onBackToStore }) {
               className="admin-login-btn"
               disabled={loginLoading}
             >
-              {loginLoading ? "Authenticating..." : "Access Administrator Dashboard"}
+              {loginLoading ? "Authenticating with Supabase..." : "Sign In to Admin Portal"}
             </button>
           </form>
 
@@ -359,7 +569,7 @@ export default function AdminDashboard({ onBackToStore }) {
               className="back-store-btn"
               onClick={onBackToStore}
             >
-              <ArrowLeft size={16} /> Return to Storefront
+              <ArrowLeft size={14} /> Back to Boutique Storefront
             </button>
           </div>
         </div>
@@ -367,530 +577,464 @@ export default function AdminDashboard({ onBackToStore }) {
     );
   }
 
+  // 3. Authenticated Admin Dashboard: Product Management Only
   return (
     <div className="admin-container">
-      {/* ADMIN HEADER */}
+      {/* HEADER */}
       <header className="admin-header">
         <div className="admin-header-left">
-          <button className="admin-back-btn" onClick={onBackToStore} title="Return to public boutique">
-            <ArrowLeft size={18} /> Storefront
+          <button
+            type="button"
+            className="admin-back-btn"
+            onClick={onBackToStore}
+            title="Return to boutique website"
+          >
+            <ArrowLeft size={16} /> Back to Store
           </button>
           <div className="admin-brand">
             <h1>Theethrealpalatte</h1>
-            <span className="admin-role-tag">Admin Management</span>
+            <span className="admin-role-tag">Product Management</span>
           </div>
         </div>
 
         <div className="admin-header-right">
           <span className="admin-user-pill">
-            👤 {adminUser.name} ({adminUser.email})
+            <Sparkles size={13} style={{ color: "var(--blush-strong)" }} />
+            {adminUser?.name || "Administrator"} (Admin)
           </span>
           <button
-            className="admin-refresh-btn"
-            onClick={fetchDashboardData}
-            title="Refresh data from database"
-          >
-            <RefreshCw size={16} />
-          </button>
-          <button
+            type="button"
             className="admin-logout-btn"
             onClick={handleAdminLogout}
-            title="Sign out of admin"
+            title="Log Out of Admin Portal"
           >
-            <LogOut size={16} /> Logout
+            <LogOut size={15} /> Log Out
           </button>
         </div>
       </header>
 
-      {/* TOAST FEEDBACK */}
-      {feedbackMsg && <div className="admin-toast">{feedbackMsg}</div>}
+      {/* DASHBOARD BODY */}
+      <div className="admin-body" style={{ display: "block", maxWidth: "1240px", margin: "0 auto", padding: "28px 20px" }}>
+        {/* STATS BAR */}
+        <div className="admin-stats-grid" style={{ marginBottom: "24px" }}>
+          <div className="stat-card">
+            <div className="stat-label">Total Products</div>
+            <div className="stat-value">{totalCount}</div>
+            <div className="stat-sub">Handmade catalogue items</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-label">In Stock / Available</div>
+            <div className="stat-value" style={{ color: "#2b7a3e" }}>{availableCount}</div>
+            <div className="stat-sub">Active on storefront</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-label">Out of Stock / Hidden</div>
+            <div className="stat-value" style={{ color: "#a83232" }}>{outOfStockCount}</div>
+            <div className="stat-sub">Unavailable for enquiry</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-label">Crochet & Bloom Studio</div>
+            <div className="stat-value">{crochetCount} / {bloomCount}</div>
+            <div className="stat-sub">Crochet / Bloom bouquets</div>
+          </div>
+        </div>
 
-      <div className="admin-body">
-        {/* SIDEBAR TABS */}
-        <aside className="admin-sidebar">
-          <nav className="admin-nav">
-            <button
-              className={`admin-nav-item ${activeTab === "overview" ? "active" : ""}`}
-              onClick={() => setActiveTab("overview")}
-            >
-              <LayoutDashboard size={18} />
-              <span>Overview</span>
-            </button>
+        {/* CONTROLS BAR: SEARCH, FILTER, ADD PRODUCT */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: "14px",
+            background: "#ffffff",
+            padding: "16px 20px",
+            borderRadius: "8px",
+            border: "1px solid var(--line)",
+            marginBottom: "20px",
+          }}
+        >
+          {/* SEARCH & CATEGORY */}
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap", flex: 1 }}>
+            <div style={{ position: "relative", minWidth: "220px", maxWidth: "340px", flex: 1 }}>
+              <Search
+                size={16}
+                style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "var(--muted)" }}
+              />
+              <input
+                type="text"
+                placeholder="Search products by name..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "9px 12px 9px 36px",
+                  border: "1px solid var(--line)",
+                  borderRadius: "4px",
+                  fontSize: "13px",
+                  outline: "none",
+                }}
+              />
+            </div>
 
-            <button
-              className={`admin-nav-item ${activeTab === "products" ? "active" : ""}`}
-              onClick={() => setActiveTab("products")}
-            >
-              <Package size={18} />
-              <span>Products ({products.length})</span>
-            </button>
-
-            <button
-              className={`admin-nav-item ${activeTab === "orders" ? "active" : ""}`}
-              onClick={() => setActiveTab("orders")}
-            >
-              <ShoppingBag size={18} />
-              <span>Orders ({orders.length})</span>
-            </button>
-
-            <button
-              className={`admin-nav-item ${activeTab === "customers" ? "active" : ""}`}
-              onClick={() => setActiveTab("customers")}
-            >
-              <Users size={18} />
-              <span>Customers ({customers.length})</span>
-            </button>
-          </nav>
-        </aside>
-
-        {/* MAIN ADMIN CONTENT AREA */}
-        <main className="admin-main">
-          {/* TAB 1: OVERVIEW */}
-          {activeTab === "overview" && (
-            <section className="admin-tab-pane">
-              <div className="pane-header">
-                <h2>Store Performance Overview</h2>
-                <p>Live metrics from the production MongoDB database.</p>
-              </div>
-
-              {overview ? (
-                <>
-                  <div className="admin-stats-grid">
-                    <div className="stat-card">
-                      <span className="stat-label">Total Products</span>
-                      <strong className="stat-num">{overview.totalProducts}</strong>
-                      <span className="stat-sub">
-                        {overview.availableProducts} available · {overview.unavailableProducts} hidden
-                      </span>
-                    </div>
-
-                    <div className="stat-card">
-                      <span className="stat-label">Registered Customers</span>
-                      <strong className="stat-num">{overview.totalCustomers}</strong>
-                      <span className="stat-sub">Authentic accounts</span>
-                    </div>
-
-                    <div className="stat-card">
-                      <span className="stat-label">Saved Orders & Enquiries</span>
-                      <strong className="stat-num">{overview.totalOrders}</strong>
-                      <span className="stat-sub">Recorded in database</span>
-                    </div>
-
-                    <div className="stat-card">
-                      <span className="stat-label">Payment Verification</span>
-                      <strong className="stat-num">
-                        {overview.paymentVerifiedCount} / {overview.totalOrders}
-                      </strong>
-                      <span className="stat-sub">
-                        {overview.paymentPendingCount} pending verification
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* ORDER STATUS BREAKDOWN */}
-                  <div className="admin-section-box">
-                    <h3>Orders Grouped by Status</h3>
-                    <div className="status-chips-grid">
-                      {Object.entries(overview.statusCounts || {}).map(([st, cnt]) => (
-                        <div key={st} className={`status-chip-card status-${st}`}>
-                          <span className="status-chip-label">{st.toUpperCase()}</span>
-                          <span className="status-chip-count">{cnt}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div className="admin-loading">Loading metrics from MongoDB...</div>
-              )}
-            </section>
-          )}
-
-          {/* TAB 2: PRODUCTS */}
-          {activeTab === "products" && (
-            <section className="admin-tab-pane">
-              <div className="pane-header with-action">
-                <div>
-                  <h2>Product Catalog Management</h2>
-                  <p>Changes persist immediately to MongoDB and storefront.</p>
-                </div>
-                <button className="primary-admin-btn" onClick={handleOpenAddProduct}>
-                  <Plus size={16} /> Add Product
+            {/* CATEGORY FILTER PILLS */}
+            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+              {["all", "Crochet", "Bloom Studio", "Paintings", "Accessories"].map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setSelectedCategory(cat)}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: "20px",
+                    border: "1px solid",
+                    borderColor: selectedCategory === cat ? "var(--blush-strong)" : "var(--line)",
+                    background: selectedCategory === cat ? "var(--soft-cream)" : "#ffffff",
+                    color: selectedCategory === cat ? "var(--blush-strong)" : "var(--espresso)",
+                    fontSize: "12px",
+                    fontWeight: selectedCategory === cat ? "600" : "400",
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  {cat === "all" ? "All Categories" : cat}
                 </button>
-              </div>
+              ))}
+            </div>
+          </div>
 
-              <div className="admin-table-wrap">
-                <table className="admin-table">
-                  <thead>
-                    <tr>
-                      <th>Image</th>
-                      <th>Product Name</th>
-                      <th>Category</th>
-                      <th>Price</th>
-                      <th>Stock</th>
-                      <th>Availability</th>
-                      <th>Actions</th>
+          {/* ACTIONS */}
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <button
+              type="button"
+              onClick={fetchProducts}
+              className="secondary-btn"
+              style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "8px 14px" }}
+              title="Refresh product list"
+            >
+              <RefreshCw size={14} className={loadingData ? "spin" : ""} /> Refresh
+            </button>
+
+            <button
+              type="button"
+              onClick={handleOpenAddProduct}
+              className="admin-login-btn"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "8px 18px",
+                margin: 0,
+                width: "auto",
+                fontWeight: 600,
+              }}
+            >
+              <Plus size={16} /> Add Product
+            </button>
+          </div>
+        </div>
+
+        {/* PRODUCTS TABLE */}
+        <div className="admin-table-wrap">
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th style={{ width: "60px" }}>Image</th>
+                <th>Product Details</th>
+                <th>Category</th>
+                <th>Price</th>
+                <th>Stock</th>
+                <th>Availability</th>
+                <th style={{ textAlign: "right" }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredProducts.length === 0 ? (
+                <tr>
+                  <td colSpan={7} style={{ textAlign: "center", padding: "40px 20px", color: "var(--muted)" }}>
+                    <Package size={32} style={{ display: "block", margin: "0 auto 10px", opacity: 0.4 }} />
+                    No products found matching your filter.
+                  </td>
+                </tr>
+              ) : (
+                filteredProducts.map((p) => {
+                  const isAvail = p.is_available !== false && p.isAvailable !== false;
+                  return (
+                    <tr key={p.id || p._id}>
+                      <td>
+                        <img
+                          src={p.image || "https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?w=200"}
+                          alt={p.name}
+                          className="admin-thumb"
+                          onError={(e) => {
+                            e.target.src = "https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?w=200";
+                          }}
+                        />
+                      </td>
+                      <td>
+                        <strong style={{ fontSize: "14px", color: "var(--espresso)" }}>{p.name}</strong>
+                        <p className="admin-table-desc-preview">
+                          {p.description || "Handmade with love."}
+                        </p>
+                      </td>
+                      <td>
+                        <span
+                          className={`cat-pill ${
+                            p.type === "Crochet"
+                              ? "cat-crochet"
+                              : p.type === "Bloom Studio"
+                              ? "cat-paintings"
+                              : ""
+                          }`}
+                        >
+                          {p.type || "Crochet"}
+                        </span>
+                      </td>
+                      <td>
+                        <strong style={{ color: "var(--espresso)", fontSize: "14px" }}>
+                          ₹{Number(p.price || 0).toLocaleString("en-IN")}
+                        </strong>
+                      </td>
+                      <td>
+                        <span style={{ fontSize: "13px", color: p.stock <= 2 ? "#a83232" : "var(--muted)" }}>
+                          {p.stock !== undefined ? p.stock : 10} units
+                        </span>
+                      </td>
+                      <td>
+                        <div style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
+                          <span className={`avail-badge ${isAvail ? "active" : "hidden"}`}>
+                            {isAvail ? "In Stock" : "Out of Stock"}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleAvailability(p)}
+                            style={{
+                              background: "none",
+                              border: "none",
+                              cursor: "pointer",
+                              padding: "4px",
+                              color: isAvail ? "#2b7a3e" : "#a83232",
+                            }}
+                            title={isAvail ? "Mark Out of Stock" : "Mark Available"}
+                          >
+                            {isAvail ? <Eye size={16} /> : <EyeOff size={16} />}
+                          </button>
+                        </div>
+                      </td>
+                      <td style={{ textAlign: "right" }}>
+                        <div className="admin-row-actions" style={{ justifyContent: "flex-end" }}>
+                          <button
+                            type="button"
+                            className="row-action-btn edit"
+                            onClick={() => handleOpenEditProduct(p)}
+                            title="Edit Product Details & Price"
+                          >
+                            <Edit2 size={14} /> Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="row-action-btn delete"
+                            onClick={() => setDeletingProduct(p)}
+                            title="Delete Product"
+                          >
+                            <Trash2 size={14} /> Delete
+                          </button>
+                        </div>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {products.length === 0 ? (
-                      <tr>
-                        <td colSpan="7" style={{ textAlign: "center", padding: "30px" }}>
-                          No products found.
-                        </td>
-                      </tr>
-                    ) : (
-                      products.map((p) => (
-                        <tr key={p._id}>
-                          <td>
-                            <img
-                              src={p.image}
-                              alt={p.name}
-                              className="admin-thumb"
-                              onError={(e) => {
-                                e.target.src =
-                                  "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=100";
-                              }}
-                            />
-                          </td>
-                          <td>
-                            <strong>{p.name}</strong>
-                            <p className="admin-table-desc-preview">{p.description}</p>
-                          </td>
-                          <td>
-                            <span className={`cat-pill cat-${p.type.toLowerCase()}`}>
-                              {p.type}
-                            </span>
-                          </td>
-                          <td>₹{Number(p.price).toLocaleString("en-IN")}</td>
-                          <td>{p.stock !== undefined ? p.stock : 10}</td>
-                          <td>
-                            <span className={`avail-badge ${p.isAvailable ? "active" : "hidden"}`}>
-                              {p.isAvailable ? "Available" : "Unavailable"}
-                            </span>
-                          </td>
-                          <td>
-                            <div className="admin-row-actions">
-                              <button
-                                className="row-action-btn edit-btn"
-                                onClick={() => handleOpenEditProduct(p)}
-                                title="Edit product"
-                              >
-                                <Edit2 size={15} />
-                              </button>
-                              <button
-                                className="row-action-btn delete-btn"
-                                onClick={() => handleDeleteProduct(p)}
-                                title="Delete product"
-                              >
-                                <Trash2 size={15} />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-          )}
-
-          {/* TAB 3: ORDERS */}
-          {activeTab === "orders" && (
-            <section className="admin-tab-pane">
-              <div className="pane-header with-action">
-                <div>
-                  <h2>Customer Orders & Enquiries</h2>
-                  <p>All recorded purchases with real-time status management.</p>
-                </div>
-                <div className="order-filter-wrap">
-                  <label>Status:</label>
-                  <select
-                    value={orderStatusFilter}
-                    onChange={(e) => setOrderStatusFilter(e.target.value)}
-                  >
-                    <option value="all">All Orders</option>
-                    <option value="pending">Pending</option>
-                    <option value="confirmed">Confirmed</option>
-                    <option value="processing">Processing</option>
-                    <option value="shipped">Shipped</option>
-                    <option value="completed">Completed</option>
-                    <option value="cancelled">Cancelled</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="admin-table-wrap">
-                <table className="admin-table">
-                  <thead>
-                    <tr>
-                      <th>Order #</th>
-                      <th>Customer</th>
-                      <th>Items</th>
-                      <th>Total</th>
-                      <th>Date</th>
-                      <th>Status</th>
-                      <th>Payment</th>
-                      <th>Details</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredOrders.length === 0 ? (
-                      <tr>
-                        <td colSpan="8" style={{ textAlign: "center", padding: "30px" }}>
-                          No orders found matching status "{orderStatusFilter}".
-                        </td>
-                      </tr>
-                    ) : (
-                      filteredOrders.map((ord) => (
-                        <tr key={ord._id}>
-                          <td>
-                            <strong>{ord.orderNumber}</strong>
-                            <span className="order-type-tag">
-                              {ord.orderType === "whatsapp_enquiry" ? "WhatsApp" : "Store Checkout"}
-                            </span>
-                          </td>
-                          <td>
-                            <div>{ord.customerName}</div>
-                            <small>{ord.customerEmail}</small>
-                            <br />
-                            <small>{ord.customerPhone}</small>
-                          </td>
-                          <td>
-                            {ord.items.map((it, idx) => (
-                              <div key={idx} className="order-item-chip">
-                                {it.name} × {it.quantity}
-                              </div>
-                            ))}
-                          </td>
-                          <td>
-                            <strong>₹{ord.total.toLocaleString("en-IN")}</strong>
-                          </td>
-                          <td>{new Date(ord.createdAt).toLocaleDateString()}</td>
-                          <td>
-                            <select
-                              className={`order-status-select status-color-${ord.status}`}
-                              value={ord.status}
-                              onChange={(e) =>
-                                handleUpdateOrderStatus(ord._id, e.target.value, undefined)
-                              }
-                            >
-                              <option value="pending">Pending</option>
-                              <option value="confirmed">Confirmed</option>
-                              <option value="processing">Processing</option>
-                              <option value="shipped">Shipped</option>
-                              <option value="completed">Completed</option>
-                              <option value="cancelled">Cancelled</option>
-                            </select>
-                          </td>
-                          <td>
-                            <label className="payment-verify-label">
-                              <input
-                                type="checkbox"
-                                checked={ord.paymentVerified || false}
-                                onChange={(e) =>
-                                  handleUpdateOrderStatus(ord._id, undefined, e.target.checked)
-                                }
-                              />
-                              <span>{ord.paymentVerified ? "Verified ✓" : "Pending"}</span>
-                            </label>
-                          </td>
-                          <td>
-                            <button
-                              className="view-order-btn"
-                              onClick={() => setViewingOrder(ord)}
-                            >
-                              View
-                            </button>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-          )}
-
-          {/* TAB 4: CUSTOMERS */}
-          {activeTab === "customers" && (
-            <section className="admin-tab-pane">
-              <div className="pane-header">
-                <h2>Registered Customers</h2>
-                <p>Private user accounts (passwords and sensitive keys excluded).</p>
-              </div>
-
-              <div className="admin-table-wrap">
-                <table className="admin-table">
-                  <thead>
-                    <tr>
-                      <th>Customer Name</th>
-                      <th>Email</th>
-                      <th>Phone</th>
-                      <th>Registered On</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {customers.length === 0 ? (
-                      <tr>
-                        <td colSpan="4" style={{ textAlign: "center", padding: "30px" }}>
-                          No registered customer accounts yet.
-                        </td>
-                      </tr>
-                    ) : (
-                      customers.map((c) => (
-                        <tr key={c._id}>
-                          <td>
-                            <strong>{c.name}</strong>
-                          </td>
-                          <td>{c.email}</td>
-                          <td>{c.phone || "—"}</td>
-                          <td>{new Date(c.createdAt).toLocaleDateString()}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-          )}
-        </main>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      {/* PRODUCT ADD / EDIT MODAL */}
+      {/* ADD / EDIT PRODUCT MODAL WITH LIVE PREVIEW */}
       {showProductModal && (
-        <div className="overlay" onClick={() => setShowProductModal(false)}>
-          <div className="admin-modal-card" onClick={(e) => e.stopPropagation()}>
-            <button className="auth-close-btn" onClick={() => setShowProductModal(false)}>
-              <X size={20} />
-            </button>
-            <div className="admin-modal-header">
-              <h3>{editingProduct ? "Edit Product" : "Add New Boutique Creation"}</h3>
-              <p>Set product details, prices in INR, category, and image asset.</p>
+        <div className="admin-modal-overlay" onClick={() => setShowProductModal(false)}>
+          <div
+            className="admin-modal-card"
+            style={{ maxWidth: "780px" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="admin-modal-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div>
+                <h3>{editingProduct ? "Edit Product" : "Add New Product"}</h3>
+                <p>Configure product details, pricing, category, and live storefront preview</p>
+              </div>
+              <button
+                type="button"
+                className="modal-close-btn"
+                onClick={() => setShowProductModal(false)}
+              >
+                <X size={18} />
+              </button>
             </div>
 
             <form onSubmit={handleSaveProduct} className="admin-modal-form">
-              <div className="form-row-2">
-                <div className="auth-field">
-                  <label>Product Name *</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Handmade Crochet Tulip"
-                    value={productForm.name}
-                    onChange={(e) =>
-                      setProductForm({ ...productForm, name: e.target.value })
-                    }
-                    required
-                  />
-                </div>
-
-                <div className="auth-field">
-                  <label>Price in INR (₹) *</label>
-                  <input
-                    type="number"
-                    placeholder="e.g. 350"
-                    value={productForm.price}
-                    onChange={(e) =>
-                      setProductForm({ ...productForm, price: e.target.value })
-                    }
-                    required
-                    min={0}
-                  />
-                </div>
-              </div>
-
-              <div className="form-row-2">
-                <div className="auth-field">
-                  <label>Category *</label>
-                  <select
-                    value={productForm.type}
-                    onChange={(e) =>
-                      setProductForm({ ...productForm, type: e.target.value })
-                    }
-                  >
-                    <option value="Crochet">Crochet</option>
-                    <option value="Paintings">Paintings</option>
-                  </select>
-                </div>
-
-                <div className="auth-field">
-                  <label>Stock Quantity</label>
-                  <input
-                    type="number"
-                    placeholder="10"
-                    value={productForm.stock}
-                    onChange={(e) =>
-                      setProductForm({ ...productForm, stock: e.target.value })
-                    }
-                    min={0}
-                  />
-                </div>
-              </div>
-
-              <div className="auth-field">
-                <label>Description</label>
-                <textarea
-                  rows="3"
-                  placeholder="Artisanal description of materials, colors, customization notes..."
-                  value={productForm.description}
-                  onChange={(e) =>
-                    setProductForm({ ...productForm, description: e.target.value })
-                  }
-                ></textarea>
-              </div>
-
-              {/* IMAGE SELECTION */}
-              <div className="auth-field">
-                <label>Product Image (Upload File or Enter Image URL)</label>
-                <div className="image-upload-zone">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    id="admin-image-file"
-                    onChange={handleImageFileChange}
-                    style={{ display: "none" }}
-                  />
-                  <label htmlFor="admin-image-file" className="file-upload-btn">
-                    <Upload size={16} /> Choose Image File
-                  </label>
-                  <span className="file-name-label">
-                    {productImageFile ? productImageFile.name : "or specify URL below:"}
-                  </span>
-                </div>
-                <input
-                  type="text"
-                  placeholder="https://... or /uploads/..."
-                  value={productForm.imageUrl}
-                  onChange={(e) => {
-                    setProductForm({ ...productForm, imageUrl: e.target.value });
-                    if (!productImageFile) setProductImagePreview(e.target.value);
-                  }}
-                  style={{ marginTop: "8px" }}
-                />
-
-                {productImagePreview && (
-                  <div className="image-live-preview">
-                    <span>Preview:</span>
-                    <img src={productImagePreview} alt="Live preview" />
+              <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr", gap: "24px" }}>
+                {/* LEFT COLUMN: FORM FIELDS */}
+                <div>
+                  <div className="form-group">
+                    <label>Product Name *</label>
+                    <input
+                      type="text"
+                      value={productForm.name}
+                      onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
+                      placeholder="e.g. Crochet Sunflower Bouquet"
+                      required
+                    />
                   </div>
-                )}
+
+                  <div className="form-row-2">
+                    <div className="form-group">
+                      <label>Price (₹ INR) *</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={productForm.price}
+                        onChange={(e) => setProductForm({ ...productForm, price: e.target.value })}
+                        placeholder="350"
+                        required
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Category</label>
+                      <select
+                        value={productForm.type}
+                        onChange={(e) => setProductForm({ ...productForm, type: e.target.value })}
+                      >
+                        <option value="Crochet">Crochet</option>
+                        <option value="Bloom Studio">Bloom Studio</option>
+                        <option value="Paintings">Paintings</option>
+                        <option value="Accessories">Accessories</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Description</label>
+                    <textarea
+                      rows={3}
+                      value={productForm.description}
+                      onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
+                      placeholder="Handmade sunshine, just for you..."
+                    />
+                  </div>
+
+                  <div className="form-row-2">
+                    <div className="form-group">
+                      <label>Stock Count</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={productForm.stock}
+                        onChange={(e) => setProductForm({ ...productForm, stock: e.target.value })}
+                      />
+                    </div>
+                    <div className="form-group" style={{ display: "flex", alignItems: "center", paddingTop: "20px" }}>
+                      <label style={{ display: "inline-flex", alignItems: "center", gap: "8px", cursor: "pointer", textTransform: "none", fontSize: "13px" }}>
+                        <input
+                          type="checkbox"
+                          checked={productForm.isAvailable}
+                          onChange={(e) => setProductForm({ ...productForm, isAvailable: e.target.checked })}
+                          style={{ width: "auto" }}
+                        />
+                        Available for WhatsApp Enquiry
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Product Image</label>
+                    <div className="image-upload-zone" style={{ marginBottom: "8px" }}>
+                      <label className="file-upload-btn">
+                        <Upload size={14} /> Upload Image File
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageFileChange}
+                          style={{ display: "none" }}
+                        />
+                      </label>
+                      <span className="file-name-label">
+                        {productImageFile ? productImageFile.name : "or paste image URL below"}
+                      </span>
+                    </div>
+                    <input
+                      type="url"
+                      placeholder="https://... image web link"
+                      value={productForm.imageUrl}
+                      onChange={(e) => {
+                        setProductForm({ ...productForm, imageUrl: e.target.value });
+                        if (!productImageFile) setProductImagePreview(e.target.value);
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* RIGHT COLUMN: LIVE STOREFRONT PREVIEW CARD */}
+                <div>
+                  <div style={{ fontSize: "11px", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted)", fontWeight: "600", marginBottom: "8px" }}>
+                    Live Storefront Card Preview
+                  </div>
+                  <div
+                    style={{
+                      border: "1px solid var(--line)",
+                      borderRadius: "8px",
+                      overflow: "hidden",
+                      background: "#ffffff",
+                      boxShadow: "0 6px 18px rgba(0,0,0,0.06)",
+                    }}
+                  >
+                    <div style={{ position: "relative", width: "100%", height: "200px", background: "var(--cream)" }}>
+                      <img
+                        src={productImagePreview || productForm.imageUrl || "https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?w=400"}
+                        alt="Product preview"
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                        onError={(e) => {
+                          e.target.src = "https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?w=400";
+                        }}
+                      />
+                      {!productForm.isAvailable && (
+                        <div
+                          style={{
+                            position: "absolute",
+                            top: "10px",
+                            left: "10px",
+                            background: "rgba(168, 50, 50, 0.9)",
+                            color: "#fff",
+                            fontSize: "11px",
+                            padding: "3px 8px",
+                            borderRadius: "4px",
+                            fontWeight: "500",
+                          }}
+                        >
+                          Out of Stock
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ padding: "14px 16px" }}>
+                      <span style={{ fontSize: "11px", color: "var(--blush-strong)", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: "600" }}>
+                        {productForm.type}
+                      </span>
+                      <h4 style={{ fontFamily: "Playfair Display, serif", fontSize: "16px", margin: "4px 0 6px", color: "var(--espresso)" }}>
+                        {productForm.name || "Product Title"}
+                      </h4>
+                      <div style={{ fontWeight: "600", fontSize: "15px", color: "var(--espresso)", marginBottom: "6px" }}>
+                        ₹{Number(productForm.price || 0).toLocaleString("en-IN")}
+                      </div>
+                      <p style={{ fontSize: "12px", color: "var(--muted)", margin: 0, lineHeight: 1.4, maxHeight: "50px", overflow: "hidden" }}>
+                        {productForm.description || "Handmade sunshine, just for you."}
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              <div className="auth-field checkbox-field">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={productForm.isAvailable}
-                    onChange={(e) =>
-                      setProductForm({ ...productForm, isAvailable: e.target.checked })
-                    }
-                  />
-                  <span>Active & Available for Customer Purchase</span>
-                </label>
-              </div>
-
-              <div className="modal-actions">
+              <div className="modal-actions" style={{ marginTop: "24px", borderTop: "1px solid var(--line)", paddingTop: "16px" }}>
                 <button
                   type="button"
                   className="secondary-btn"
@@ -900,10 +1044,11 @@ export default function AdminDashboard({ onBackToStore }) {
                 </button>
                 <button
                   type="submit"
-                  className="primary-admin-btn"
+                  className="admin-login-btn"
+                  style={{ width: "auto", margin: 0, padding: "10px 24px" }}
                   disabled={savingProduct}
                 >
-                  {savingProduct ? "Saving..." : editingProduct ? "Save Changes" : "Create Product"}
+                  {savingProduct ? "Saving to Supabase..." : editingProduct ? "Save Changes" : "Create Product"}
                 </button>
               </div>
             </form>
@@ -911,91 +1056,45 @@ export default function AdminDashboard({ onBackToStore }) {
         </div>
       )}
 
-      {/* ORDER DETAILS MODAL */}
-      {viewingOrder && (
-        <div className="overlay" onClick={() => setViewingOrder(null)}>
-          <div className="admin-modal-card order-view-card" onClick={(e) => e.stopPropagation()}>
-            <button className="auth-close-btn" onClick={() => setViewingOrder(null)}>
-              <X size={20} />
-            </button>
+      {/* DELETE CONFIRMATION MODAL */}
+      {deletingProduct && (
+        <div className="admin-modal-overlay" onClick={() => setDeletingProduct(null)}>
+          <div className="admin-modal-card" style={{ maxWidth: "440px" }} onClick={(e) => e.stopPropagation()}>
             <div className="admin-modal-header">
-              <h3>Order {viewingOrder.orderNumber}</h3>
-              <p>Placed on {new Date(viewingOrder.createdAt).toLocaleString()}</p>
+              <h3 style={{ color: "#a83232" }}>Delete Product</h3>
+              <p>Are you sure you want to permanently delete this product?</p>
             </div>
-
-            <div className="order-details-grid">
-              <div className="order-detail-col">
-                <h4>Customer Information</h4>
-                <p><strong>Name:</strong> {viewingOrder.customerName}</p>
-                <p><strong>Email:</strong> {viewingOrder.customerEmail}</p>
-                <p><strong>Phone:</strong> {viewingOrder.customerPhone}</p>
-                <p><strong>Address:</strong> {viewingOrder.deliveryAddress || "Not provided"}</p>
-                {viewingOrder.customerNotes && (
-                  <p><strong>Notes:</strong> {viewingOrder.customerNotes}</p>
-                )}
-              </div>
-
-              <div className="order-detail-col">
-                <h4>Status & Payment</h4>
-                <div style={{ marginBottom: "12px" }}>
-                  <label>Order Status:</label>
-                  <select
-                    className="order-status-select"
-                    value={viewingOrder.status}
-                    onChange={(e) =>
-                      handleUpdateOrderStatus(viewingOrder._id, e.target.value, undefined)
-                    }
-                  >
-                    <option value="pending">Pending</option>
-                    <option value="confirmed">Confirmed</option>
-                    <option value="processing">Processing</option>
-                    <option value="shipped">Shipped</option>
-                    <option value="completed">Completed</option>
-                    <option value="cancelled">Cancelled</option>
-                  </select>
-                </div>
-
-                <label className="payment-verify-label">
-                  <input
-                    type="checkbox"
-                    checked={viewingOrder.paymentVerified || false}
-                    onChange={(e) =>
-                      handleUpdateOrderStatus(viewingOrder._id, undefined, e.target.checked)
-                    }
-                  />
-                  <span>Manual Payment Verified by Business</span>
-                </label>
+            <div style={{ padding: "12px", background: "var(--soft-cream)", borderRadius: "4px", marginBottom: "20px" }}>
+              <strong>{deletingProduct.name}</strong>
+              <div style={{ fontSize: "12px", color: "var(--muted)", marginTop: "4px" }}>
+                Price: ₹{Number(deletingProduct.price).toLocaleString("en-IN")} • Category: {deletingProduct.type}
               </div>
             </div>
-
-            <div className="order-items-table-wrap">
-              <h4>Ordered Items</h4>
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>Item</th>
-                    <th>Price</th>
-                    <th>Qty</th>
-                    <th>Subtotal</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {viewingOrder.items.map((it, idx) => (
-                    <tr key={idx}>
-                      <td>{it.name}</td>
-                      <td>₹{it.price.toLocaleString("en-IN")}</td>
-                      <td>{it.quantity}</td>
-                      <td>₹{(it.price * it.quantity).toLocaleString("en-IN")}</td>
-                    </tr>
-                  ))}
-                  <tr>
-                    <td colSpan="3" style={{ textAlign: "right" }}><strong>Total:</strong></td>
-                    <td><strong>₹{viewingOrder.total.toLocaleString("en-IN")}</strong></td>
-                  </tr>
-                </tbody>
-              </table>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="secondary-btn"
+                onClick={() => setDeletingProduct(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="admin-login-btn"
+                style={{ width: "auto", margin: 0, background: "#a83232", borderColor: "#a83232" }}
+                onClick={confirmDeleteProduct}
+              >
+                Confirm Delete
+              </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* TOAST FEEDBACK NOTIFICATION */}
+      {feedbackMsg && (
+        <div className="admin-toast" role="status" aria-live="polite">
+          {feedbackMsg}
         </div>
       )}
     </div>

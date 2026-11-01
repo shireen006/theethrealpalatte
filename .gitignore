@@ -62,7 +62,15 @@ backup/
 *.original
 *.tmp
 *.temp
+backup_styles_diff_before_fix.txt
 
 # AI agent & IDE scratch directories
 .system_generated/
 scratch/
+
+# Test screenshots & verification artifacts
+e2e-tests/**/*.png
+e2e-tests/*.png
+!e2e-tests/test_desktop.png
+!e2e-tests/test_mobile.png
+!e2e-tests/test_tablet.png

@@ -3,7 +3,7 @@
     "feature": "1. Initial Load & Desktop Layout",
     "status": "PASS",
     "what": "Loaded http://localhost:5173/ at 1280x800",
-    "evidence": "Title=\"Theethrealpalatte\", Announcement=\"✦ Handmade with love\n|\nMade to order\n|\nFree shipping on orders above ₹999\n✦\", Logo=\"Theethrealpalatte 🧶\""
+    "evidence": "Title=\"Theethrealpalatte — Handmade Crochet & Original Paintings\", Announcement=\"✦ Handmade with love\n|\nMade to order\n|\nFree shipping on orders above ₹999\n✦\", Logo=\"Theethrealpalatte 🧶\""
   },
   {
     "feature": "2. Navigation Links & Dropdown",
@@ -73,8 +73,8 @@
   },
   {
     "feature": "13. Console & Network Diagnostics",
-    "status": "PASS (with minor notice)",
+    "status": "PASS",
     "what": "Uncaught JavaScript exceptions and failed network asset requests",
-    "evidence": "Console errors (excluding favicon): 1. Failed network requests: 0. Dev server Vite HMR active and healthy."
+    "evidence": "Console errors (excluding favicon): 0. Failed network requests: 0. Dev server Vite HMR active and healthy."
   }
 ]
