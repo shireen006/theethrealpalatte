@@ -1,42 +1,24 @@
 # Roadmap
 
-## Phase 1: Foundation & Build Fixes
-- **Status**: Ready to plan
-- **Goal**: Resolve file path anomalies (move `main.jsx` into `src/` to align with `index.html`), ensure root / subdirectory configuration is clean, verify dev and production build scripts run without errors.
+## Phase 1: Foundation, Build & WhatsApp Hardening
+- **Status**: COMPLETE & VERIFIED (UAT Report: `1-UAT.md`)
 - **Deliverables**:
   - Validated build pipeline (`npm run build` succeeds).
-  - Clean dev startup (`npm run dev`).
+  - WhatsApp-first workflow (+91 8088645598) with zero checkout/payment forms.
+  - Server-side RBAC and privilege escalation protection trigger.
 
-## Phase 2: Component Architecture & Refactoring
-- **Status**: Pending Phase 1
-- **Goal**: Break down monolithic `main.jsx` (~2,877 lines) into clean, modular, reusable React components and dedicated data files.
+## Phase 2: Complete Functionality, Supabase Database & Touchscreen Optimization
+- **Status**: ACTIVE / IN PROGRESS
+- **Goal**:
+  - Fix admin thumbnail duplication by linking individual product images.
+  - Complete product CRUD with Supabase PostgreSQL and Storage image management (upload, replace, validate).
+  - Implement stock management with automatic availability toggling when stock reaches 0.
+  - Dynamic database-driven dashboard statistics.
+  - Touchscreen optimization across entire website: 44px touch targets, tap menus, mobile cart/modals, active touch feedback, and responsive admin dashboard.
+  - Comprehensive automated browser testing across 8 viewports (320px to 1920px).
 - **Deliverables**:
-  - `src/data/products.js` & `src/data/slides.js`
-  - `src/components/Header.jsx` & `AnnouncementBar.jsx`
-  - `src/components/HeroCarousel.jsx`
-  - `src/components/ProductCard.jsx` & `ProductGrid.jsx`
-  - `src/components/ProductModal.jsx`
-  - `src/components/CartDrawer.jsx` & `WishlistDrawer.jsx`
-  - `src/components/Toast.jsx`
+  - `AdminDashboard.jsx` enhanced with thumbnail fix, storage validation, responsive mobile cards, and dynamic statistics.
+  - `styles.css` updated with >=44px touch targets, mobile responsiveness, and touch feedback.
+  - `supabase_schema.sql` safe migration.
+  - Comprehensive Playwright test suite and UAT verification report.
 
-## Phase 3: State Persistence & Routing
-- **Status**: Pending Phase 2
-- **Goal**: Persist cart and wishlist state in `localStorage` so items survive page reloads; wire up `react-router-dom` for deep-linkable URLs (`/`, `/shop`, `/product/:id`, `/wishlist`, `/cart`).
-- **Deliverables**:
-  - Custom hooks: `useCart`, `useWishlist` with localStorage sync.
-  - Page routes and navigation using `react-router-dom`.
-
-## Phase 4: WhatsApp Checkout & Order Summary
-- **Status**: Pending Phase 3
-- **Goal**: Implement a checkout modal and pre-filled WhatsApp order generation allowing buyers to submit their order details straight to the seller.
-- **Deliverables**:
-  - Checkout form (name, contact number, delivery address, custom notes).
-  - WhatsApp link generation utility (`https://wa.me/...`).
-  - Order confirmation screen.
-
-## Phase 5: Testing & Polishing
-- **Status**: Pending Phase 4
-- **Goal**: Establish automated testing with Vitest and perform responsive design and accessibility audit.
-- **Deliverables**:
-  - Vitest test setup and unit test suite for cart and pricing logic.
-  - Accessibility audit and performance optimization.
