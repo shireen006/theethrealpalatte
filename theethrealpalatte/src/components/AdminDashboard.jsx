@@ -269,7 +269,10 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
     }
 
     if (profile?.role !== "admin") {
-      throw new Error("Access Denied: Your account does not have administrator privileges.");
+      const email = session.user?.email || "this account";
+      throw new Error(
+        `Access Denied: Account "${email}" does not have administrator privileges (role='${profile?.role || "none"}'). Run the SQL command to promote it.`
+      );
     }
 
     return session;
@@ -651,6 +654,7 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
 
         if (updErr) {
           console.error("Product update failed:", updErr);
+          const currentEmail = adminUser?.email || "your account";
           if (
             updErr.code === "PGRST116" ||
             (updErr.message && (
@@ -661,7 +665,7 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
             (updErr.details && updErr.details.includes("0 rows"))
           ) {
             throw new Error(
-              "Update permission denied by Supabase RLS. Please ensure you are logged in with an authorized administrator account (role='admin' in public.profiles)."
+              `Update permission denied by Supabase RLS. Please ensure public.products RLS policies and role='admin' for "${currentEmail}" are updated in Supabase SQL editor.`
             );
           }
           throw new Error(`Could not save product: ${updErr.message}`);

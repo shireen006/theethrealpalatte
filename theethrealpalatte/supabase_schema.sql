@@ -23,13 +23,13 @@ alter table public.profiles add column if not exists role text default 'customer
 alter table public.profiles enable row level security;
 
 -- Helper security function: Check if current authenticated user has 'admin' role
--- SECURITY DEFINER ensures execution with table owner privileges, preventing recursive RLS loops.
+-- SECURITY DEFINER ensures execution with table owner privileges.
 -- Explicit auth.uid() null check and fixed search_path prevent privilege escalation.
 create or replace function public.is_admin()
 returns boolean
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, auth
 stable
 as $$
 declare
@@ -53,10 +53,9 @@ create policy "Users can view own profile"
   on public.profiles for select
   using (auth.uid() = id);
 
+-- Remove recursive policies on profiles so is_admin() never triggers an infinite loop
 drop policy if exists "Admins can view all profiles" on public.profiles;
-create policy "Admins can view all profiles"
-  on public.profiles for select
-  using (public.is_admin() = true);
+drop policy if exists "Admins can update all profiles" on public.profiles;
 
 drop policy if exists "Users can insert own profile" on public.profiles;
 create policy "Users can insert own profile"
@@ -72,12 +71,6 @@ create policy "Users can update own profile"
     auth.uid() = id
     and (role = 'customer' or public.is_admin() = true)
   );
-
-drop policy if exists "Admins can update all profiles" on public.profiles;
-create policy "Admins can update all profiles"
-  on public.profiles for update
-  using (public.is_admin() = true)
-  with check (public.is_admin() = true);
 
 -- Database-level trigger to strictly prevent privilege escalation (cannot change role to 'admin' unless already admin)
 create or replace function public.protect_profile_role()
@@ -200,20 +193,44 @@ create policy "Public can view products"
 drop policy if exists "Admins can insert products" on public.products;
 create policy "Admins can insert products"
   on public.products for insert
-  with check (public.is_admin() = true);
+  with check (
+    public.is_admin() = true
+    or exists (
+      select 1 from public.profiles
+      where public.profiles.id = auth.uid() and public.profiles.role = 'admin'
+    )
+  );
 
 -- C. ONLY verified store administrators can update products
 drop policy if exists "Admins can update products" on public.products;
 create policy "Admins can update products"
   on public.products for update
-  using (public.is_admin() = true)
-  with check (public.is_admin() = true);
+  using (
+    public.is_admin() = true
+    or exists (
+      select 1 from public.profiles
+      where public.profiles.id = auth.uid() and public.profiles.role = 'admin'
+    )
+  )
+  with check (
+    public.is_admin() = true
+    or exists (
+      select 1 from public.profiles
+      where public.profiles.id = auth.uid() and public.profiles.role = 'admin'
+    )
+  );
 
 -- D. ONLY verified store administrators can delete products
 drop policy if exists "Admins can delete products" on public.products;
 create policy "Admins can delete products"
   on public.products for delete
-  using (public.is_admin() = true);
+  using (
+    public.is_admin() = true
+    or exists (
+      select 1 from public.profiles
+      where public.profiles.id = auth.uid() and public.profiles.role = 'admin'
+    )
+  );
 
 
 -- 4. SUPABASE STORAGE BUCKET FOR PRODUCT IMAGES
@@ -234,19 +251,46 @@ create policy "Public can view product images"
 drop policy if exists "Admins can upload product images" on storage.objects;
 create policy "Admins can upload product images"
   on storage.objects for insert
-  with check (bucket_id = 'product-images' and public.is_admin() = true);
+  with check (
+    bucket_id = 'product-images'
+    and (
+      public.is_admin() = true
+      or exists (
+        select 1 from public.profiles
+        where public.profiles.id = auth.uid() and public.profiles.role = 'admin'
+      )
+    )
+  );
 
 -- C. Only admins can update product images
 drop policy if exists "Admins can update product images" on storage.objects;
 create policy "Admins can update product images"
   on storage.objects for update
-  using (bucket_id = 'product-images' and public.is_admin() = true);
+  using (
+    bucket_id = 'product-images'
+    and (
+      public.is_admin() = true
+      or exists (
+        select 1 from public.profiles
+        where public.profiles.id = auth.uid() and public.profiles.role = 'admin'
+      )
+    )
+  );
 
 -- D. Only admins can delete product images
 drop policy if exists "Admins can delete product images" on storage.objects;
 create policy "Admins can delete product images"
   on storage.objects for delete
-  using (bucket_id = 'product-images' and public.is_admin() = true);
+  using (
+    bucket_id = 'product-images'
+    and (
+      public.is_admin() = true
+      or exists (
+        select 1 from public.profiles
+        where public.profiles.id = auth.uid() and public.profiles.role = 'admin'
+      )
+    )
+  );
 
 
 -- 5. INITIAL SEED DATA FOR PRODUCTS (Populates only if table is empty)
@@ -285,6 +329,11 @@ grant all on table public.products to authenticated;
 
 -- ==============================================================================
 -- INSTRUCTIONS TO PROMOTE YOUR ACCOUNT TO STORE ADMIN:
--- 1. Replace 'your_email@example.com' with your registered Supabase email:
--- UPDATE public.profiles SET role = 'admin' WHERE email = 'your_email@example.com';
+-- Run this in your Supabase SQL Editor (replace with your registered email):
+--
+-- INSERT INTO public.profiles (id, email, full_name, role, created_at, updated_at)
+-- SELECT id, email, coalesce(raw_user_meta_data->>'full_name', split_part(email, '@', 1)), 'admin', now(), now()
+-- FROM auth.users
+-- WHERE email = 'your_admin_email@example.com'
+-- ON CONFLICT (id) DO UPDATE SET role = 'admin', updated_at = now();
 -- ==============================================================================
