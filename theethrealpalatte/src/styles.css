@@ -2369,15 +2369,18 @@ a {
   border-bottom-color: var(--espresso);
 }
 
-.auth-error-banner {
+.auth-error-banner,
+.admin-error-box {
   background: #fdf2f2;
   border: 1px solid #f8b4b4;
   color: #9b1c1c;
-  padding: 10px 14px;
-  border-radius: 4px;
+  padding: 11px 15px;
+  border-radius: 6px;
   font-size: 13px;
   margin-bottom: 16px;
-  line-height: 1.4;
+  line-height: 1.45;
+  word-break: break-word;
+  font-weight: 500;
 }
 
 .auth-form {

@@ -61,76 +61,92 @@ const slides = [
 
 const products = [
   {
-    id: 1,
+    id: "653cfd59-f159-48c0-bac2-1acc338e420f",
     name: "Crochet Sunflower Bouquet",
     price: 350,
     type: "Crochet",
     image: sunflowerbouquet,
     description:
       "Handmade sunshine, just for you.\nA cheerful crochet sunflower bouquet made with love.",
+    stock: 15,
+    is_available: true,
   },
   {
-    id: 2,
+    id: "f4aac8f1-1b5b-4a0e-a6fd-fdbfa0903ae6",
     name: "Crochet Flower Keychains",
     price: 130,
     type: "Crochet",
     image: sunflowerkeychain,
     description:
       "A tiny handmade flower for your everyday essentials.\nPerfect for keys, bags, or gifting.\n[Custamization available.]",
+    stock: 25,
+    is_available: true,
   },
   {
-    id: 3,
+    id: "42e2783a-417a-4d93-b754-03abddbc5e39",
     name: "Four Leaf Clover Keychain",
     price: 150,
     type: "Crochet",
     image: fourleafcloverkeychain,
     description:
       "A little handmade lucky charm.\nCarry a touch of luck wherever you go.",
+    stock: 20,
+    is_available: true,
   },
   {
-    id: 4,
+    id: "fe7f9d26-8cfe-4355-a1dc-4cbe6c27302a",
     name: "Butterfly Hairtie",
     price: 250,
     type: "Crochet",
     image: butterflyhairtie,
     description:
       "A delicate butterfly made to brighten your hairstyle.\nHandmade with soft crochet details.",
+    stock: 12,
+    is_available: true,
   },
   {
-    id: 5,
+    id: "d9656c23-91cd-4a08-83ef-e004e525940c",
     name: "Crochet Bow Clip",
     price: 150,
     type: "Crochet",
     image: bowhairtie,
     description:
       "A sweet handmade bow for your everyday look.\nSimple, delicate, and made with love.",
+    stock: 18,
+    is_available: true,
   },
   {
-    id: 7,
+    id: "39d6a70a-2043-4459-8903-b402c6260f68",
     name: "Blue Dream Bouquet",
     price: 199,
     type: "Bloom Studio",
     image: bluedreambouquet,
     description:
       "A dreamy handcrafted blue flower bouquet with an elegant birthday card and delicate ribbon.\nMade slowly and thoughtfully with love.",
+    stock: 10,
+    is_available: true,
   },
   {
-    id: 9,
+    id: "d845b519-9b6d-473e-a42c-4b7bd45537b8",
     name: "Crimson Lily Bouquet",
     price: 300,
     type: "Bloom Studio",
     image: crimsonlilybouquet,
     description:
       "Handmade burgundy and white chenille flower bouquet finished with a soft pink ribbon.\nMade slowly and thoughtfully with love.",
+    stock: 8,
+    is_available: true,
   },
   {
-    id: 10,
+    id: "059a3863-1a7c-4652-9837-19fd521ec744",
     name: "Mini Forever Bouquet",
     price: 250,
     type: "Bloom Studio",
     image: miniforeverbouquet,
     description:
       "A delicate mini eternal bouquet crafted slowly and thoughtfully with love.\nAn everlasting keepsake for someone special.",
+    stock: 14,
+    is_available: true,
   },
 ];
 
@@ -608,8 +624,10 @@ export default function App() {
             ...p,
             id,
             price: Number(p.price),
+            stock: Number(p.stock !== undefined ? p.stock : 10),
             image: img || sunflowerbouquet,
-            isAvailable: p.is_available !== false,
+            isAvailable: p.is_available !== false && (p.stock === undefined || Number(p.stock) > 0),
+            is_available: p.is_available !== false,
           };
         });
         setProductList(mapped);

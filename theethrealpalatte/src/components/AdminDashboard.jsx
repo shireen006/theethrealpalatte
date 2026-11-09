@@ -31,34 +31,50 @@ import crimsonlilybouquet from "../images/crimsonlilybouquet.jpg";
 import miniforeverbouquet from "../images/miniforeverbouquet.jpg";
 
 /**
- * Resolves each product to its dedicated individual image asset,
- * completely fixing the bug where multiple products displayed the same thumbnail.
+ * Seed catalogue image mappings strictly keyed by permanent Supabase UUID.
+ * Used ONLY as a graceful initial fallback for original seed products when their
+ * database image field is empty. Never matches by product name.
  */
-export function resolveProductImage(prod) {
-  if (!prod) return sunflowerbouquet;
-  const img = prod.image || prod.imageUrl;
-  if (
-    img &&
-    typeof img === "string" &&
-    (img.startsWith("http") ||
-      img.startsWith("data:") ||
-      img.startsWith("/assets") ||
-      img.startsWith("blob:") ||
-      img.startsWith("/src"))
-  ) {
-    return img;
+export const DEFAULT_PRODUCT_IMAGES_BY_ID = {
+  "653cfd59-f159-48c0-bac2-1acc338e420f": sunflowerbouquet,
+  "f4aac8f1-1b5b-4a0e-a6fd-fdbfa0903ae6": sunflowerkeychain,
+  "42e2783a-417a-4d93-b754-03abddbc5e39": fourleafcloverkeychain,
+  "fe7f9d26-8cfe-4355-a1dc-4cbe6c27302a": butterflyhairtie,
+  "d9656c23-91cd-4a08-83ef-e004e525940c": bowhairtie,
+  "39d6a70a-2043-4459-8903-b402c6260f68": bluedreambouquet,
+  "d845b519-9b6d-473e-a42c-4b7bd45537b8": crimsonlilybouquet,
+  "059a3863-1a7c-4652-9837-19fd521ec744": miniforeverbouquet,
+};
+
+/**
+ * Neutral SVG placeholder image used when a product has no image.
+ * Prevents defaulting or accidentally assigning sunflower bouquet to unrelated items.
+ */
+export const PLACEHOLDER_PRODUCT_IMAGE =
+  "data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22300%22%20height%3D%22300%22%20viewBox%3D%220%200%20300%20300%22%3E%3Crect%20width%3D%22100%25%22%20height%3D%22100%25%22%20fill%3D%22%23F7F5F0%22%2F%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2250%25%22%20dominant-baseline%3D%22middle%22%20text-anchor%3D%22middle%22%20font-family%3D%22sans-serif%22%20font-size%3D%2214%22%20fill%3D%22%239B8F86%22%3ENo%20Image%3C%2Ftext%3E%3C%2Fsvg%3E";
+
+/**
+ * Resolves each product's display image with Supabase database as the single source of truth:
+ * 1. If prod.image or prod.image_url is present, that exact database URL is always returned.
+ * 2. If the product is an initial seed item whose image is empty, its dedicated initial image is used by UUID ID.
+ * 3. Otherwise returns a neutral placeholder.
+ * Never performs arbitrary name matching and never defaults all items to sunflower bouquet.
+ */
+export function getProductDisplayImage(prod) {
+  if (!prod) return PLACEHOLDER_PRODUCT_IMAGE;
+  const dbImg = prod.image_url || prod.image || prod.imageUrl;
+  if (dbImg && typeof dbImg === "string" && dbImg.trim().length > 0) {
+    return dbImg.trim();
   }
-  const name = (prod.name || "").toLowerCase();
-  if (name.includes("sunflower bouquet")) return sunflowerbouquet;
-  if (name.includes("sunflower keychain") || name.includes("flower keychain")) return sunflowerkeychain;
-  if (name.includes("four leaf") || name.includes("clover")) return fourleafcloverkeychain;
-  if (name.includes("butterfly")) return butterflyhairtie;
-  if (name.includes("bow clip") || name.includes("bow hair") || name.includes("bow")) return bowhairtie;
-  if (name.includes("blue dream")) return bluedreambouquet;
-  if (name.includes("crimson lily")) return crimsonlilybouquet;
-  if (name.includes("mini forever") || name.includes("forever bouquet")) return miniforeverbouquet;
-  return sunflowerbouquet;
+  const idStr = String(prod.id || prod._id || "");
+  if (idStr && DEFAULT_PRODUCT_IMAGES_BY_ID[idStr]) {
+    return DEFAULT_PRODUCT_IMAGES_BY_ID[idStr];
+  }
+  return PLACEHOLDER_PRODUCT_IMAGE;
 }
+
+// Backward compatibility alias for any existing imports
+export const resolveProductImage = getProductDisplayImage;
 
 export default function AdminDashboard({ onBackToStore, onProductsUpdated, initialProducts = [] }) {
   const [token, setToken] = useState("");
@@ -132,7 +148,28 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
     };
 
     verifyAdminSession();
-    return () => { active = false; };
+
+    let authSub = null;
+    if (isSupabaseConfigured) {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        if (!active) return;
+        if (event === "SIGNED_OUT" || !session?.user) {
+          setToken("");
+          setAdminUser(null);
+          localStorage.removeItem("trp_admin_token");
+          localStorage.removeItem("trp_admin_user");
+        } else if (session?.user && (event === "SIGNED_IN" || event === "TOKEN_REFRESHED")) {
+          setToken(session.access_token);
+          verifyAdminSession();
+        }
+      });
+      authSub = subscription;
+    }
+
+    return () => {
+      active = false;
+      if (authSub) authSub.unsubscribe();
+    };
   }, []);
 
   // Admin login credentials state
@@ -145,12 +182,14 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
   const [products, setProducts] = useState(initialProducts);
   const [loadingData, setLoadingData] = useState(false);
   const [feedbackMsg, setFeedbackMsg] = useState("");
+  const [dashboardError, setDashboardError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
 
   // Product modal (create / edit)
   const [showProductModal, setShowProductModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
+  const [modalError, setModalError] = useState("");
   const [productForm, setProductForm] = useState({
     name: "",
     price: "",
@@ -158,7 +197,6 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
     description: "",
     stock: 10,
     isAvailable: true,
-    imageUrl: "",
   });
   const [productImageFile, setProductImageFile] = useState(null);
   const [productImagePreview, setProductImagePreview] = useState("");
@@ -166,10 +204,59 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
 
   // Delete confirmation modal
   const [deletingProduct, setDeletingProduct] = useState(null);
+  const [deleteError, setDeleteError] = useState("");
+  const [deletingInProgress, setDeletingInProgress] = useState(false);
 
   const notify = (msg) => {
     setFeedbackMsg(msg);
     setTimeout(() => setFeedbackMsg(""), 3500);
+  };
+
+  /**
+   * Helper: Ensure admin session is fresh and profile role is 'admin' before executing any database mutation.
+   * Explicitly raises an error if the session is missing, expired, or non-admin.
+   */
+  const getVerifiedAdminSession = async () => {
+    if (typeof window !== "undefined" && window.__TEST_ADMIN_SESSION__) {
+      return { user: window.__TEST_ADMIN_SESSION__ };
+    }
+
+    if (!isSupabaseConfigured) {
+      throw new Error("Supabase is not configured. Please check your credentials.");
+    }
+
+    const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
+    if (sessionErr) {
+      throw new Error(`Authentication check failed: ${sessionErr.message}`);
+    }
+
+    let session = sessionData?.session;
+
+    if (!session || !session.user || (session.expires_at && session.expires_at * 1000 < Date.now())) {
+      const { data: refreshData, error: refreshErr } = await supabase.auth.refreshSession();
+      if (refreshErr || !refreshData?.session?.user) {
+        throw new Error("Administrator session has expired or is missing. Please sign in again.");
+      }
+      session = refreshData.session;
+      setToken(session.access_token);
+    }
+
+    // Verify role server-side in PostgreSQL profiles table
+    const { data: profile, error: profErr } = await supabase
+      .from("profiles")
+      .select("role, full_name, email")
+      .eq("id", session.user.id)
+      .maybeSingle();
+
+    if (profErr) {
+      throw new Error(`Could not verify admin role: ${profErr.message}`);
+    }
+
+    if (profile?.role !== "admin") {
+      throw new Error("Access Denied: Your account does not have administrator privileges.");
+    }
+
+    return session;
   };
 
   const handleAdminLogin = async (e) => {
@@ -221,6 +308,7 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
       setAdminUser(adminObj);
       localStorage.setItem("trp_admin_token", activeToken);
       localStorage.setItem("trp_admin_user", JSON.stringify(adminObj));
+      await fetchProducts();
     } catch (err) {
       setLoginError(err.message);
     } finally {
@@ -242,16 +330,18 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
 
   // Fetch products from Supabase
   const fetchProducts = async () => {
-    if (!token) return;
     setLoadingData(true);
     try {
       if (isSupabaseConfigured) {
         const { data, error } = await supabase
           .from("products")
           .select("*")
-          .order("created_at", { ascending: false });
+          .order("created_at", { ascending: true });
 
-        if (!error && Array.isArray(data) && data.length > 0) {
+        if (error) {
+          console.error("Failed to load products from Supabase:", error);
+          setDashboardError("Could not load products: " + error.message);
+        } else if (Array.isArray(data) && data.length > 0) {
           const mapped = data.map((p) => {
             const stockNum = Number(p.stock !== undefined ? p.stock : 10);
             return {
@@ -262,6 +352,7 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
             };
           });
           setProducts(mapped);
+          setDashboardError("");
           return;
         }
       }
@@ -280,22 +371,40 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
         );
       }
     } catch (err) {
-      console.warn("Failed to load products:", err);
+      console.error("Failed to load products exception:", err);
+      setDashboardError("Failed to load products: " + err.message);
       if (initialProducts) setProducts(initialProducts);
     } finally {
       setLoadingData(false);
     }
   };
 
+  // Fetch on mount
+  useEffect(() => {
+    fetchProducts();
+  }, []);
+
+  // Fetch when token is set/changes
   useEffect(() => {
     if (token) {
       fetchProducts();
     }
   }, [token]);
 
+  // Sync initialProducts if products is still empty
+  useEffect(() => {
+    if (initialProducts && initialProducts.length > 0) {
+      setProducts((current) => {
+        if (!current || current.length === 0) return initialProducts;
+        return current;
+      });
+    }
+  }, [initialProducts]);
+
   // Handle open add product modal
   const handleOpenAddProduct = () => {
     setEditingProduct(null);
+    setModalError("");
     setProductForm({
       name: "",
       price: "",
@@ -303,7 +412,6 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
       description: "",
       stock: 10,
       isAvailable: true,
-      imageUrl: "",
     });
     setProductImageFile(null);
     setProductImagePreview("");
@@ -313,19 +421,19 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
   // Handle open edit product modal
   const handleOpenEditProduct = (prod) => {
     setEditingProduct(prod);
+    setModalError("");
+    setProductImageFile(null);
+    const existingImg = prod.image || resolveProductImage(prod);
+    setProductImagePreview(existingImg);
     const stockNum = prod.stock !== undefined ? Number(prod.stock) : 10;
-    const resolvedImg = resolveProductImage(prod);
     setProductForm({
-      name: prod.name,
-      price: prod.price,
+      name: prod.name || "",
+      price: prod.price !== undefined ? prod.price : "",
       type: prod.type || "Crochet",
       description: prod.description || "",
       stock: stockNum,
       isAvailable: stockNum > 0 && prod.is_available !== false && prod.isAvailable !== false,
-      imageUrl: prod.image || "",
     });
-    setProductImageFile(null);
-    setProductImagePreview(resolvedImg);
     setShowProductModal(true);
   };
 
@@ -334,13 +442,14 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
     const file = e.target.files[0];
     if (file) {
       if (!file.type.startsWith("image/")) {
-        alert("Please select a valid image file (JPG, PNG, WebP, GIF).");
+        setModalError("Please select a valid image file (JPG, PNG, WebP, GIF).");
         return;
       }
       if (file.size > 5 * 1024 * 1024) {
-        alert("Image file size must be less than 5MB.");
+        setModalError("Image file size must be less than 5MB.");
         return;
       }
+      setModalError("");
       setProductImageFile(file);
       setProductImagePreview(URL.createObjectURL(file));
     }
@@ -349,149 +458,178 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
   // Handle product save (create / update)
   const handleSaveProduct = async (e) => {
     e.preventDefault();
+    setModalError("");
+
     if (!productForm.name.trim()) {
-      alert("Please enter a product name.");
+      setModalError("Please enter a product name.");
       return;
     }
-    if (!productForm.price || Number(productForm.price) < 0) {
-      alert("Please enter a valid product price.");
+    if (productForm.price === "" || Number(productForm.price) < 0) {
+      setModalError("Please enter a valid product price.");
       return;
     }
 
     setSavingProduct(true);
 
     try {
-      let finalImageUrl = productForm.imageUrl;
+      // 1. Verify administrator authentication with Supabase
+      await getVerifiedAdminSession();
 
-      // 1. Upload to Supabase Storage if a new file was chosen
+      const targetProductId = editingProduct
+        ? editingProduct.id
+        : typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `prod_${Date.now()}`;
+
+      if (!targetProductId) {
+        throw new Error("Missing product ID. Target database row is undefined.");
+      }
+
+      let newUploadedImageUrl = null;
+      let previousStoragePath = null;
+
+      // 2. Upload to Supabase Storage ONLY if a new file was chosen by the user
       if (productImageFile && isSupabaseConfigured) {
-        try {
-          const fileExt = productImageFile.name.split(".").pop();
-          const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
-          const filePath = `products/${fileName}`;
+        const fileExt = productImageFile.name.split(".").pop();
+        const safeName = productImageFile.name.replace(/[^a-zA-Z0-9.-]/g, "_");
+        const uniqueSuffix = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+        // Per requirement 11: product-images/{productId}/{unique-file-name}
+        const filePath = `${targetProductId}/${uniqueSuffix}_${safeName}`;
 
-          const { data: uploadData, error: uploadErr } = await supabase.storage
-            .from("product-images")
-            .upload(filePath, productImageFile, {
-              cacheControl: "3600",
-              upsert: false,
-            });
-
-          if (!uploadErr && uploadData) {
-            const { data: { publicUrl } } = supabase.storage
-              .from("product-images")
-              .getPublicUrl(filePath);
-            finalImageUrl = publicUrl;
-
-            // If replacing an existing Supabase storage file, safely clean up old object
-            if (
-              editingProduct &&
-              editingProduct.image &&
-              editingProduct.image.includes("/storage/v1/object/public/product-images/")
-            ) {
-              try {
-                const oldPath = editingProduct.image.split("/storage/v1/object/public/product-images/")[1];
-                if (oldPath) {
-                  await supabase.storage.from("product-images").remove([decodeURIComponent(oldPath)]);
-                }
-              } catch (delOldErr) {
-                console.warn("Storage cleanup notice:", delOldErr);
-              }
-            }
-          } else {
-            // Fallback to data URL
-            finalImageUrl = await new Promise((resolve) => {
-              const reader = new FileReader();
-              reader.onloadend = () => resolve(reader.result);
-              reader.readAsDataURL(productImageFile);
-            });
-          }
-        } catch {
-          finalImageUrl = await new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result);
-            reader.readAsDataURL(productImageFile);
+        const { data: uploadData, error: uploadErr } = await supabase.storage
+          .from("product-images")
+          .upload(filePath, productImageFile, {
+            cacheControl: "3600",
+            upsert: false,
           });
+
+        if (uploadErr) {
+          console.error("Storage upload failed:", uploadErr);
+          throw new Error(`Could not upload image to Supabase Storage: ${uploadErr.message}`);
+        }
+
+        if (uploadData) {
+          const { data: { publicUrl } } = supabase.storage
+            .from("product-images")
+            .getPublicUrl(filePath);
+          newUploadedImageUrl = publicUrl;
+
+          // Note old storage image path for cleanup ONLY after database update succeeds
+          if (
+            editingProduct &&
+            editingProduct.image &&
+            editingProduct.image.includes("/storage/v1/object/public/product-images/")
+          ) {
+            previousStoragePath = editingProduct.image.split("/storage/v1/object/public/product-images/")[1];
+          }
         }
       }
 
-      // Stock logic: when stock reaches zero, automatically set availability to false
-      const stockCount = Math.max(0, Number(productForm.stock) || 0);
+      // Stock logic: numeric non-negative integer
+      const stockCount = Math.max(0, parseInt(productForm.stock, 10) || 0);
+      // If stock becomes 0, automatically mark availability to false
       const isAvailable = stockCount === 0 ? false : Boolean(productForm.isAvailable);
 
-      const productRecord = {
-        name: productForm.name.trim(),
-        price: Number(productForm.price),
-        type: productForm.type,
-        description: productForm.description.trim(),
-        stock: stockCount,
-        is_available: isAvailable,
-        image: finalImageUrl || "",
-        updated_at: new Date().toISOString(),
-      };
-
       if (editingProduct) {
-        // UPDATE existing product
-        if (isSupabaseConfigured) {
-          const { error: updErr } = await supabase
-            .from("products")
-            .update(productRecord)
-            .eq("id", editingProduct.id);
-
-          if (updErr) {
-            console.warn("Supabase product update notice:", updErr.message);
-          }
-        }
-
-        setProducts((prev) =>
-          prev.map((p) =>
-            p.id === editingProduct.id
-              ? {
-                  ...p,
-                  ...productRecord,
-                  image: resolveProductImage(productRecord),
-                  isAvailable: productRecord.is_available,
-                }
-              : p
-          )
-        );
-        notify(`"${productForm.name}" updated successfully! 🌸`);
-      } else {
-        // CREATE new product
-        let createdProduct = {
-          id: `prod_${Date.now()}`,
-          ...productRecord,
-          image: resolveProductImage(productRecord),
-          isAvailable: productRecord.is_available,
-          created_at: new Date().toISOString(),
+        // UPDATE existing product targeting exact Supabase products.id row
+        // Per requirement 6: If NO new file was selected, do NOT change or touch image!
+        const updates = {
+          name: productForm.name.trim(),
+          description: productForm.description ? productForm.description.trim() : "",
+          price: Number(productForm.price),
+          type: productForm.type || "Crochet",
+          stock: stockCount,
+          is_available: isAvailable,
+          updated_at: new Date().toISOString(),
         };
 
-        if (isSupabaseConfigured) {
-          const { data: newProd, error: insErr } = await supabase
-            .from("products")
-            .insert({
-              name: productRecord.name,
-              price: productRecord.price,
-              type: productRecord.type,
-              description: productRecord.description,
-              stock: productRecord.stock,
-              is_available: productRecord.is_available,
-              image: productRecord.image,
-            })
-            .select()
-            .maybeSingle();
+        if (newUploadedImageUrl) {
+          updates.image = newUploadedImageUrl;
+        }
 
-          if (!insErr && newProd) {
-            createdProduct = {
-              ...newProd,
-              image: resolveProductImage(newProd),
-              isAvailable: newProd.is_available !== false,
-            };
+        console.log(`[Supabase] Updating product ID ${targetProductId}:`, updates);
+
+        const { data, error: updErr } = await supabase
+          .from("products")
+          .update(updates)
+          .eq("id", targetProductId)
+          .select()
+          .single();
+
+        if (updErr) {
+          console.error("Product update failed:", updErr);
+          throw new Error(`Could not save product: ${updErr.message}`);
+        }
+
+        if (!data) {
+          throw new Error("Could not save product: Supabase did not return updated record.");
+        }
+
+        console.log(`[Supabase] Product ${targetProductId} updated successfully:`, data);
+
+        // Safe storage cleanup: ONLY delete old image AFTER database update confirmed
+        if (previousStoragePath) {
+          try {
+            await supabase.storage.from("product-images").remove([decodeURIComponent(previousStoragePath)]);
+          } catch (delOldErr) {
+            console.warn("Storage cleanup notice (non-fatal):", delOldErr);
           }
         }
 
-        setProducts((prev) => [createdProduct, ...prev]);
-        notify(`"${productForm.name}" added to catalogue! 🌷`);
+        // Update local UI state using returned database row
+        const updatedRow = {
+          ...data,
+          image: resolveProductImage(data),
+          stock: Number(data.stock !== undefined ? data.stock : 0),
+          isAvailable: data.is_available !== false,
+        };
+
+        setProducts((prev) =>
+          prev.map((p) => (p.id === targetProductId ? updatedRow : p))
+        );
+
+        notify(`"${data.name}" updated successfully! 🌸`);
+      } else {
+        // CREATE new product via real Supabase INSERT
+        const insertPayload = {
+          id: targetProductId,
+          name: productForm.name.trim(),
+          description: productForm.description ? productForm.description.trim() : "",
+          price: Number(productForm.price),
+          type: productForm.type || "Crochet",
+          stock: stockCount,
+          is_available: isAvailable,
+          image: newUploadedImageUrl || "",
+        };
+
+        console.log("[Supabase] Creating new product:", insertPayload);
+
+        const { data, error: insErr } = await supabase
+          .from("products")
+          .insert(insertPayload)
+          .select()
+          .single();
+
+        if (insErr) {
+          console.error("Product creation failed:", insErr);
+          throw new Error(`Could not save product: ${insErr.message}`);
+        }
+
+        if (!data) {
+          throw new Error("Could not save product: Supabase did not return created record.");
+        }
+
+        console.log("[Supabase] Product created successfully:", data);
+
+        const newRow = {
+          ...data,
+          image: resolveProductImage(data),
+          stock: Number(data.stock !== undefined ? data.stock : 0),
+          isAvailable: data.is_available !== false,
+        };
+
+        setProducts((prev) => [newRow, ...prev]);
+        notify(`"${data.name}" added to catalogue! 🌷`);
       }
 
       if (onProductsUpdated) {
@@ -499,7 +637,8 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
       }
       setShowProductModal(false);
     } catch (err) {
-      alert("Error saving product: " + err.message);
+      console.error("Save product error:", err);
+      setModalError(err.message || "Failed to save product.");
     } finally {
       setSavingProduct(false);
     }
@@ -511,31 +650,45 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
     const newAvail = !currentAvail;
 
     try {
-      if (isSupabaseConfigured) {
-        const { error } = await supabase
-          .from("products")
-          .update({ is_available: newAvail, updated_at: new Date().toISOString() })
-          .eq("id", prod.id);
+      await getVerifiedAdminSession();
 
-        if (error) {
-          console.warn("Supabase toggle availability notice:", error.message);
-        }
+      const { data, error } = await supabase
+        .from("products")
+        .update({
+          is_available: newAvail,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", prod.id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Supabase toggle availability error:", error);
+        notify(`Could not update availability: ${error.message}`);
+        return;
+      }
+
+      if (!data) {
+        notify("Could not update availability: No response from Supabase.");
+        return;
       }
 
       setProducts((prev) =>
         prev.map((p) =>
           p.id === prod.id
-            ? { ...p, is_available: newAvail, isAvailable: newAvail }
+            ? { ...p, is_available: data.is_available, isAvailable: data.is_available }
             : p
         )
       );
-      notify(`"${prod.name}" marked as ${newAvail ? "Available" : "Out of Stock"}.`);
+
+      notify(`"${data.name}" marked as ${data.is_available ? "Available" : "Out of Stock"}.`);
 
       if (onProductsUpdated) {
         onProductsUpdated();
       }
     } catch (err) {
-      console.warn("Toggle error:", err);
+      console.error("Toggle error:", err);
+      notify(`Could not update availability: ${err.message}`);
     }
   };
 
@@ -543,28 +696,40 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
   const confirmDeleteProduct = async () => {
     if (!deletingProduct) return;
     const prod = deletingProduct;
+    setDeleteError("");
+    setDeletingInProgress(true);
 
     try {
-      if (isSupabaseConfigured) {
-        // If image was stored in Supabase storage, remove it
-        if (prod.image && prod.image.includes("/storage/v1/object/public/product-images/")) {
-          try {
-            const oldPath = prod.image.split("/storage/v1/object/public/product-images/")[1];
-            if (oldPath) {
-              await supabase.storage.from("product-images").remove([decodeURIComponent(oldPath)]);
-            }
-          } catch (delStorageErr) {
-            console.warn("Storage deletion notice:", delStorageErr);
+      await getVerifiedAdminSession();
+
+      console.log(`[Supabase] Deleting product ID ${prod.id}...`);
+
+      const { data, error } = await supabase
+        .from("products")
+        .delete()
+        .eq("id", prod.id)
+        .select();
+
+      if (error) {
+        console.error("Product deletion failed:", error);
+        throw new Error(`Could not delete product: ${error.message}`);
+      }
+
+      if (!data || data.length === 0) {
+        throw new Error("Could not delete product: Product not found or deletion permission denied.");
+      }
+
+      console.log(`[Supabase] Product ${prod.id} deleted successfully.`);
+
+      // If image was stored in Supabase storage, remove it ONLY after database deletion succeeds
+      if (prod.image && prod.image.includes("/storage/v1/object/public/product-images/")) {
+        try {
+          const oldPath = prod.image.split("/storage/v1/object/public/product-images/")[1];
+          if (oldPath) {
+            await supabase.storage.from("product-images").remove([decodeURIComponent(oldPath)]);
           }
-        }
-
-        const { error } = await supabase
-          .from("products")
-          .delete()
-          .eq("id", prod.id);
-
-        if (error) {
-          console.warn("Supabase delete product notice:", error.message);
+        } catch (delStorageErr) {
+          console.warn("Storage deletion notice (non-fatal):", delStorageErr);
         }
       }
 
@@ -576,7 +741,10 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
         onProductsUpdated();
       }
     } catch (err) {
-      alert("Error deleting product: " + err.message);
+      console.error("Delete product exception:", err);
+      setDeleteError(err.message);
+    } finally {
+      setDeletingInProgress(false);
     }
   };
 
@@ -790,6 +958,13 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
             <div className="stat-sub" style={{ marginTop: "4px" }}>Dynamic database breakdown</div>
           </div>
         </div>
+
+        {/* DASHBOARD ERROR NOTIFICATION */}
+        {dashboardError && (
+          <div className="admin-error-box" role="alert" style={{ marginBottom: "20px" }}>
+            {dashboardError}
+          </div>
+        )}
 
         {/* CONTROLS BAR: SEARCH, CATEGORY PILLS, ADD PRODUCT */}
         <div
@@ -1115,6 +1290,11 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
             </div>
 
             <form onSubmit={handleSaveProduct} className="admin-modal-form">
+              {modalError && (
+                <div className="admin-error-box" role="alert" style={{ marginBottom: "18px" }}>
+                  {modalError}
+                </div>
+              )}
               <div className="admin-modal-grid">
                 {/* LEFT COLUMN: FORM FIELDS */}
                 <div className="admin-form-fields">
@@ -1212,7 +1392,7 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
                     </div>
                   </div>
 
-                  {/* IMAGE UPLOAD & URL */}
+                  {/* IMAGE UPLOAD (DEVICE SELECTION ONLY) */}
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label>Product Imagery</label>
                     <div
@@ -1224,7 +1404,11 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
                       </div>
                       <div className="image-upload-text">
                         <strong>
-                          {productImageFile ? productImageFile.name : "Choose an image from your device"}
+                          {productImageFile
+                            ? productImageFile.name
+                            : editingProduct
+                            ? "Change image from your device (optional)"
+                            : "Choose an image from your device"}
                         </strong>
                         <span>JPG, PNG, WebP up to 5MB</span>
                       </div>
@@ -1236,24 +1420,6 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
                         style={{ display: "none" }}
                       />
                     </div>
-
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px", margin: "10px 0 6px" }}>
-                      <span style={{ fontSize: "11px", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>
-                        or link image URL
-                      </span>
-                      <div style={{ height: "1px", background: "var(--line)", width: "100%" }} />
-                    </div>
-
-                    <input
-                      type="url"
-                      placeholder="https://... image web link"
-                      value={productForm.imageUrl}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setProductForm({ ...productForm, imageUrl: val });
-                        if (!productImageFile) setProductImagePreview(val);
-                      }}
-                    />
                   </div>
                 </div>
 
@@ -1274,8 +1440,9 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
                       <img
                         src={
                           productImagePreview ||
-                          productForm.imageUrl ||
-                          resolveProductImage({ name: productForm.name, type: productForm.type })
+                          (editingProduct
+                            ? editingProduct.image || resolveProductImage(editingProduct)
+                            : resolveProductImage({ name: productForm.name, type: productForm.type }))
                         }
                         alt="Product preview"
                         onError={(e) => {
@@ -1359,7 +1526,15 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
 
       {/* DELETE CONFIRMATION MODAL */}
       {deletingProduct && (
-        <div className="admin-modal-overlay" onClick={() => setDeletingProduct(null)}>
+        <div
+          className="admin-modal-overlay"
+          onClick={() => {
+            if (!deletingInProgress) {
+              setDeletingProduct(null);
+              setDeleteError("");
+            }
+          }}
+        >
           <div
             className="admin-delete-modal-card"
             onClick={(e) => e.stopPropagation()}
@@ -1376,6 +1551,12 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
               Are you sure you want to delete this product? It will be permanently removed from your
               storefront and Supabase database.
             </p>
+
+            {deleteError && (
+              <div className="admin-error-box" role="alert" style={{ marginBottom: "16px", textAlign: "left" }}>
+                {deleteError}
+              </div>
+            )}
 
             <div className="delete-product-preview-pill">
               <img
@@ -1398,7 +1579,13 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
               <button
                 type="button"
                 className="delete-cancel-btn"
-                onClick={() => setDeletingProduct(null)}
+                onClick={() => {
+                  if (!deletingInProgress) {
+                    setDeletingProduct(null);
+                    setDeleteError("");
+                  }
+                }}
+                disabled={deletingInProgress}
               >
                 Keep Product
               </button>
@@ -1406,9 +1593,17 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
                 type="button"
                 className="delete-confirm-btn"
                 onClick={confirmDeleteProduct}
+                disabled={deletingInProgress}
               >
-                <Trash2 size={16} />
-                Confirm Delete
+                {deletingInProgress ? (
+                  <>
+                    <RefreshCw size={15} className="spin" /> Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={16} /> Confirm Delete
+                  </>
+                )}
               </button>
             </div>
           </div>
