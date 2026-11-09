@@ -329,11 +329,11 @@ grant all on table public.products to authenticated;
 
 -- ==============================================================================
 -- INSTRUCTIONS TO PROMOTE YOUR ACCOUNT TO STORE ADMIN:
--- Run this in your Supabase SQL Editor (replace with your registered email):
+-- Run this in your Supabase SQL Editor:
 --
 -- INSERT INTO public.profiles (id, email, full_name, role, created_at, updated_at)
 -- SELECT id, email, coalesce(raw_user_meta_data->>'full_name', split_part(email, '@', 1)), 'admin', now(), now()
 -- FROM auth.users
--- WHERE email = 'your_admin_email@example.com'
+-- WHERE lower(email) = 'syedashireen880@gmail.com'
 -- ON CONFLICT (id) DO UPDATE SET role = 'admin', updated_at = now();
 -- ==============================================================================
