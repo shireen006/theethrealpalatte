@@ -29,7 +29,7 @@ import miniforeverbouquet from "./images/miniforeverbouquet.jpg";
 import "./styles.css";
 import { BUSINESS_CONFIG } from "./config.js";
 import AuthModal from "./components/AuthModal.jsx";
-import AdminDashboard from "./components/AdminDashboard.jsx";
+import AdminDashboard, { getProductDisplayImage, PLACEHOLDER_PRODUCT_IMAGE } from "./components/AdminDashboard.jsx";
 import { supabase, isSupabaseConfigured } from "./lib/supabase.js";
 
 const ANNOUNCEMENT_MESSAGES = [
@@ -589,6 +589,7 @@ export default function App() {
         setIsAdminView(true);
       } else {
         setIsAdminView(false);
+        fetchProductsFromSupabase(); // Instantly refreshes catalogue when returning from admin
       }
     };
     window.addEventListener("hashchange", handleHash);
@@ -606,27 +607,37 @@ export default function App() {
         .select("*")
         .order("created_at", { ascending: true });
 
-      if (!error && Array.isArray(data) && data.length > 0) {
+      if (error) {
+        console.warn("Supabase products fetch warning:", error);
+        return;
+      }
+
+      if (Array.isArray(data) && data.length > 0) {
         const mapped = data.map((p) => {
-          const id = p.id;
-          let img = p.image || p.imageUrl;
-          if (!img || img === "") {
-            if (p.name.includes("Sunflower Bouquet")) img = sunflowerbouquet;
-            else if (p.name.includes("Flower Keychains")) img = sunflowerkeychain;
-            else if (p.name.includes("Four Leaf Clover")) img = fourleafcloverkeychain;
-            else if (p.name.includes("Butterfly Hairtie")) img = butterflyhairtie;
-            else if (p.name.includes("Bow Clip") || p.name.includes("Bow Hair")) img = bowhairtie;
-            else if (p.name.includes("Blue Dream")) img = bluedreambouquet;
-            else if (p.name.includes("Crimson Lily")) img = crimsonlilybouquet;
-            else if (p.name.includes("Mini Forever")) img = miniforeverbouquet;
-          }
+          const rawCustomUrl =
+            typeof p.image === "string" &&
+            (p.image.startsWith("http://") ||
+              p.image.startsWith("https://") ||
+              p.image.startsWith("data:image/"))
+              ? p.image.trim()
+              : "";
+          const displayImage = getProductDisplayImage({ ...p, raw_image: rawCustomUrl });
+          const stockNum = Number(p.stock !== undefined ? p.stock : 10);
+          const isAvail = p.is_available !== false && (p.stock === undefined || stockNum > 0);
+
           return {
             ...p,
-            id,
-            price: Number(p.price),
-            stock: Number(p.stock !== undefined ? p.stock : 10),
-            image: img || sunflowerbouquet,
-            isAvailable: p.is_available !== false && (p.stock === undefined || Number(p.stock) > 0),
+            id: p.id,
+            name: p.name || "",
+            price: Number(p.price) || 0,
+            description: p.description || "",
+            type: p.type || p.category || "Crochet",
+            category: p.category || p.type || "Crochet",
+            stock: stockNum,
+            image: displayImage,
+            image_url: displayImage,
+            raw_image: rawCustomUrl,
+            isAvailable: isAvail,
             is_available: p.is_available !== false,
           };
         });
@@ -637,9 +648,39 @@ export default function App() {
     }
   };
 
+  // On mount and real-time subscription for live storefront updates
   useEffect(() => {
     fetchProductsFromSupabase();
+
+    if (!isSupabaseConfigured) return;
+
+    // Real-time synchronization: subscribe to any database changes on public.products
+    const channel = supabase
+      .channel("storefront-products-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "products" },
+        (payload) => {
+          console.log("[Storefront Realtime] Products changed:", payload.eventType);
+          fetchProductsFromSupabase();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
+
+  // Keep selectedProduct modal synced when productList updates live
+  useEffect(() => {
+    if (selectedProduct) {
+      const refreshed = productList.find((p) => p.id === selectedProduct.id);
+      if (refreshed) {
+        setSelectedProduct(refreshed);
+      }
+    }
+  }, [productList]);
 
   // Sync a single cart item to Supabase PostgreSQL database
   const syncCartItemToSupabase = async (userId, prodId, quantity) => {
@@ -1401,7 +1442,13 @@ export default function App() {
                   />
                 </button>
 
-                <img src={selectedProduct.image} alt={selectedProduct.name} />
+                <img
+                  src={selectedProduct.image}
+                  alt={selectedProduct.name}
+                  onError={(e) => {
+                    e.target.src = PLACEHOLDER_PRODUCT_IMAGE;
+                  }}
+                />
               </div>
 
               {/* PRODUCT INFO COLUMN */}
@@ -1650,6 +1697,9 @@ export default function App() {
                       alt={p.name}
                       onClick={() => openProductDetail(p)}
                       style={{ cursor: "pointer" }}
+                      onError={(e) => {
+                        e.target.src = PLACEHOLDER_PRODUCT_IMAGE;
+                      }}
                     />
                   </div>
 
@@ -1833,7 +1883,7 @@ export default function App() {
                     );
                     const prodName = catalogProduct?.name || item.name || "Handcrafted Piece";
                     const unitPrice = catalogProduct ? Number(catalogProduct.price) : (Number(item.price) || 0);
-                    const itemImage = catalogProduct?.image || item.image || sunflowerbouquet;
+                    const itemImage = catalogProduct?.image || item.image || item.image_url || PLACEHOLDER_PRODUCT_IMAGE;
                     const qty = Math.max(1, Number(item.quantity) || 1);
 
                     return (

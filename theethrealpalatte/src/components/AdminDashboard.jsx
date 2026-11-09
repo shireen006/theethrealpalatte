@@ -55,20 +55,35 @@ export const PLACEHOLDER_PRODUCT_IMAGE =
 
 /**
  * Resolves each product's display image with Supabase database as the single source of truth:
- * 1. If prod.image or prod.image_url is present, that exact database URL is always returned.
- * 2. If the product is an initial seed item whose image is empty, its dedicated initial image is used by UUID ID.
+ * 1. If prod has a valid web URL (http, https, data URI), that exact database URL is always returned.
+ * 2. If the product is an initial seed item whose database image is empty, its dedicated initial image is used by UUID ID.
  * 3. Otherwise returns a neutral placeholder.
  * Never performs arbitrary name matching and never defaults all items to sunflower bouquet.
  */
 export function getProductDisplayImage(prod) {
   if (!prod) return PLACEHOLDER_PRODUCT_IMAGE;
-  const dbImg = prod.image_url || prod.image || prod.imageUrl;
-  if (dbImg && typeof dbImg === "string" && dbImg.trim().length > 0) {
+  const dbImg = prod.raw_image || prod.image_url || prod.image || prod.imageUrl;
+  if (
+    dbImg &&
+    typeof dbImg === "string" &&
+    (dbImg.startsWith("http://") ||
+      dbImg.startsWith("https://") ||
+      dbImg.startsWith("data:image/") ||
+      dbImg.startsWith("blob:"))
+  ) {
     return dbImg.trim();
   }
   const idStr = String(prod.id || prod._id || "");
   if (idStr && DEFAULT_PRODUCT_IMAGES_BY_ID[idStr]) {
     return DEFAULT_PRODUCT_IMAGES_BY_ID[idStr];
+  }
+  if (
+    dbImg &&
+    typeof dbImg === "string" &&
+    dbImg.trim().length > 0 &&
+    !dbImg.startsWith("/src/")
+  ) {
+    return dbImg.trim();
   }
   return PLACEHOLDER_PRODUCT_IMAGE;
 }
@@ -197,6 +212,7 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
     description: "",
     stock: 10,
     isAvailable: true,
+    imageUrl: "",
   });
   const [productImageFile, setProductImageFile] = useState(null);
   const [productImagePreview, setProductImagePreview] = useState("");
@@ -344,11 +360,28 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
         } else if (Array.isArray(data) && data.length > 0) {
           const mapped = data.map((p) => {
             const stockNum = Number(p.stock !== undefined ? p.stock : 10);
+            const rawCustomUrl =
+              typeof p.image === "string" &&
+              (p.image.startsWith("http://") ||
+                p.image.startsWith("https://") ||
+                p.image.startsWith("data:image/"))
+                ? p.image.trim()
+                : "";
+            const img = getProductDisplayImage({ ...p, raw_image: rawCustomUrl });
             return {
               ...p,
-              image: resolveProductImage(p),
+              id: p.id,
+              name: p.name || "",
+              price: Number(p.price) || 0,
+              description: p.description || "",
+              type: p.type || p.category || "Crochet",
+              category: p.category || p.type || "Crochet",
+              image: img,
+              image_url: img,
+              raw_image: rawCustomUrl,
               stock: stockNum,
               isAvailable: stockNum > 0 && p.is_available !== false,
+              is_available: p.is_available !== false,
             };
           });
           setProducts(mapped);
@@ -361,11 +394,28 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
         setProducts(
           initialProducts.map((p) => {
             const stockNum = Number(p.stock !== undefined ? p.stock : 10);
+            const rawCustomUrl =
+              typeof p.image === "string" &&
+              (p.image.startsWith("http://") ||
+                p.image.startsWith("https://") ||
+                p.image.startsWith("data:image/"))
+                ? p.image.trim()
+                : "";
+            const img = getProductDisplayImage({ ...p, raw_image: rawCustomUrl });
             return {
               ...p,
-              image: resolveProductImage(p),
+              id: p.id,
+              name: p.name || "",
+              price: Number(p.price) || 0,
+              description: p.description || "",
+              type: p.type || p.category || "Crochet",
+              category: p.category || p.type || "Crochet",
+              image: img,
+              image_url: img,
+              raw_image: rawCustomUrl,
               stock: stockNum,
               isAvailable: stockNum > 0 && p.isAvailable !== false && p.is_available !== false,
+              is_available: p.is_available !== false,
             };
           })
         );
@@ -391,6 +441,27 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
     }
   }, [token]);
 
+  // Real-time synchronization for Admin Dashboard: instantly updates table on DB changes
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+
+    const channel = supabase
+      .channel("admin-products-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "products" },
+        (payload) => {
+          console.log("[Admin Realtime] Product change detected:", payload.eventType);
+          fetchProducts();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   // Sync initialProducts if products is still empty
   useEffect(() => {
     if (initialProducts && initialProducts.length > 0) {
@@ -412,6 +483,7 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
       description: "",
       stock: 10,
       isAvailable: true,
+      imageUrl: "",
     });
     setProductImageFile(null);
     setProductImagePreview("");
@@ -423,16 +495,25 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
     setEditingProduct(prod);
     setModalError("");
     setProductImageFile(null);
-    const existingImg = prod.image || resolveProductImage(prod);
+    const existingImg = getProductDisplayImage(prod);
     setProductImagePreview(existingImg);
     const stockNum = prod.stock !== undefined ? Number(prod.stock) : 10;
+    const customUrl =
+      prod.raw_image ||
+      (typeof prod.image === "string" &&
+      (prod.image.startsWith("http://") ||
+        prod.image.startsWith("https://") ||
+        prod.image.startsWith("data:image/"))
+        ? prod.image
+        : "");
     setProductForm({
       name: prod.name || "",
       price: prod.price !== undefined ? prod.price : "",
-      type: prod.type || "Crochet",
+      type: prod.type || prod.category || "Crochet",
       description: prod.description || "",
       stock: stockNum,
       isAvailable: stockNum > 0 && prod.is_available !== false && prod.isAvailable !== false,
+      imageUrl: customUrl || "",
     });
     setShowProductModal(true);
   };
@@ -490,7 +571,6 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
 
       // 2. Upload to Supabase Storage ONLY if a new file was chosen by the user
       if (productImageFile && isSupabaseConfigured) {
-        const fileExt = productImageFile.name.split(".").pop();
         const safeName = productImageFile.name.replace(/[^a-zA-Z0-9.-]/g, "_");
         const uniqueSuffix = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
         // Per requirement 11: product-images/{productId}/{unique-file-name}
@@ -525,6 +605,14 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
         }
       }
 
+      // Determine final image URL: file upload takes priority, then user-entered image link
+      let finalImageUrl = null;
+      if (newUploadedImageUrl) {
+        finalImageUrl = newUploadedImageUrl;
+      } else if (productForm.imageUrl && productForm.imageUrl.trim() !== "") {
+        finalImageUrl = productForm.imageUrl.trim();
+      }
+
       // Stock logic: numeric non-negative integer
       const stockCount = Math.max(0, parseInt(productForm.stock, 10) || 0);
       // If stock becomes 0, automatically mark availability to false
@@ -532,7 +620,7 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
 
       if (editingProduct) {
         // UPDATE existing product targeting exact Supabase products.id row
-        // Per requirement 6: If NO new file was selected, do NOT change or touch image!
+        // If NO new file was selected AND NO new link given, do NOT change or touch image!
         const updates = {
           name: productForm.name.trim(),
           description: productForm.description ? productForm.description.trim() : "",
@@ -545,6 +633,11 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
 
         if (newUploadedImageUrl) {
           updates.image = newUploadedImageUrl;
+        } else if (productForm.imageUrl && productForm.imageUrl.trim() !== "") {
+          updates.image = productForm.imageUrl.trim();
+        } else if (editingProduct.raw_image && productForm.imageUrl.trim() === "") {
+          // User explicitly removed a previously saved custom URL
+          updates.image = "";
         }
 
         console.log(`[Supabase] Updating product ID ${targetProductId}:`, updates);
@@ -558,6 +651,19 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
 
         if (updErr) {
           console.error("Product update failed:", updErr);
+          if (
+            updErr.code === "PGRST116" ||
+            (updErr.message && (
+              updErr.message.includes("multiple (or no) rows") ||
+              updErr.message.includes("Cannot coerce") ||
+              updErr.message.includes("0 rows")
+            )) ||
+            (updErr.details && updErr.details.includes("0 rows"))
+          ) {
+            throw new Error(
+              "Update permission denied by Supabase RLS. Please ensure you are logged in with an authorized administrator account (role='admin' in public.profiles)."
+            );
+          }
           throw new Error(`Could not save product: ${updErr.message}`);
         }
 
@@ -577,11 +683,28 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
         }
 
         // Update local UI state using returned database row
+        const rawCustom =
+          typeof data.image === "string" &&
+          (data.image.startsWith("http://") ||
+            data.image.startsWith("https://") ||
+            data.image.startsWith("data:image/"))
+            ? data.image.trim()
+            : "";
+        const img = getProductDisplayImage({ ...data, raw_image: rawCustom });
         const updatedRow = {
           ...data,
-          image: resolveProductImage(data),
+          id: data.id,
+          name: data.name,
+          price: Number(data.price),
+          description: data.description || "",
+          type: data.type || "Crochet",
+          category: data.type || "Crochet",
+          image: img,
+          image_url: img,
+          raw_image: rawCustom,
           stock: Number(data.stock !== undefined ? data.stock : 0),
-          isAvailable: data.is_available !== false,
+          isAvailable: data.is_available !== false && (data.stock === undefined || Number(data.stock) > 0),
+          is_available: data.is_available !== false,
         };
 
         setProducts((prev) =>
@@ -599,7 +722,7 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
           type: productForm.type || "Crochet",
           stock: stockCount,
           is_available: isAvailable,
-          image: newUploadedImageUrl || "",
+          image: finalImageUrl || "",
         };
 
         console.log("[Supabase] Creating new product:", insertPayload);
@@ -612,6 +735,14 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
 
         if (insErr) {
           console.error("Product creation failed:", insErr);
+          if (
+            insErr.code === "42501" ||
+            (insErr.message && insErr.message.toLowerCase().includes("permission denied"))
+          ) {
+            throw new Error(
+              "Creation permission denied by Supabase RLS. Please ensure you are logged in with an authorized administrator account (role='admin' in public.profiles)."
+            );
+          }
           throw new Error(`Could not save product: ${insErr.message}`);
         }
 
@@ -621,11 +752,28 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
 
         console.log("[Supabase] Product created successfully:", data);
 
+        const rawCustom =
+          typeof data.image === "string" &&
+          (data.image.startsWith("http://") ||
+            data.image.startsWith("https://") ||
+            data.image.startsWith("data:image/"))
+            ? data.image.trim()
+            : "";
+        const img = getProductDisplayImage({ ...data, raw_image: rawCustom });
         const newRow = {
           ...data,
-          image: resolveProductImage(data),
+          id: data.id,
+          name: data.name,
+          price: Number(data.price),
+          description: data.description || "",
+          type: data.type || "Crochet",
+          category: data.type || "Crochet",
+          image: img,
+          image_url: img,
+          raw_image: rawCustom,
           stock: Number(data.stock !== undefined ? data.stock : 0),
-          isAvailable: data.is_available !== false,
+          isAvailable: data.is_available !== false && (data.stock === undefined || Number(data.stock) > 0),
+          is_available: data.is_available !== false,
         };
 
         setProducts((prev) => [newRow, ...prev]);
@@ -664,7 +812,18 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
 
       if (error) {
         console.error("Supabase toggle availability error:", error);
-        notify(`Could not update availability: ${error.message}`);
+        if (
+          error.code === "PGRST116" ||
+          (error.message && (
+            error.message.includes("Cannot coerce") ||
+            error.message.includes("0 rows") ||
+            error.message.includes("multiple (or no) rows")
+          ))
+        ) {
+          notify("Update permission denied by Supabase RLS. Admin role required.");
+        } else {
+          notify(`Could not update availability: ${error.message}`);
+        }
         return;
       }
 
@@ -1097,7 +1256,7 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
               ) : (
                 filteredProducts.map((p) => {
                   const isAvail = p.is_available !== false && p.isAvailable !== false;
-                  const thumbSrc = resolveProductImage(p);
+                  const thumbSrc = getProductDisplayImage(p);
                   return (
                     <tr key={p.id || p._id}>
                       <td>
@@ -1106,7 +1265,7 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
                           alt={p.name}
                           className="admin-thumb"
                           onError={(e) => {
-                            e.target.src = sunflowerbouquet;
+                            e.target.src = PLACEHOLDER_PRODUCT_IMAGE;
                           }}
                         />
                       </td>
@@ -1205,7 +1364,7 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
           ) : (
             filteredProducts.map((p) => {
               const isAvail = p.is_available !== false && p.isAvailable !== false;
-              const thumbSrc = resolveProductImage(p);
+              const thumbSrc = getProductDisplayImage(p);
               return (
                 <div className="admin-mobile-card" key={`mob_${p.id || p._id}`}>
                   <div className="admin-mobile-card-top">
@@ -1214,7 +1373,7 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
                       alt={p.name}
                       className="admin-mobile-thumb"
                       onError={(e) => {
-                        e.target.src = sunflowerbouquet;
+                        e.target.src = PLACEHOLDER_PRODUCT_IMAGE;
                       }}
                     />
                     <div className="admin-mobile-card-meta">
@@ -1392,9 +1551,25 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
                     </div>
                   </div>
 
-                  {/* IMAGE UPLOAD (DEVICE SELECTION ONLY) */}
+                  {/* IMAGE LINK & DEVICE UPLOAD */}
+                  <div className="form-group">
+                    <label>Image Link (URL)</label>
+                    <input
+                      type="text"
+                      placeholder="https://... direct image web link"
+                      value={productForm.imageUrl || ""}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setProductForm({ ...productForm, imageUrl: val });
+                        if (!productImageFile) {
+                          setProductImagePreview(val);
+                        }
+                      }}
+                    />
+                  </div>
+
                   <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label>Product Imagery</label>
+                    <label>Or Upload from Device</label>
                     <div
                       className="image-upload-box"
                       onClick={() => document.getElementById("admin-product-file-input").click()}
@@ -1441,12 +1616,12 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
                         src={
                           productImagePreview ||
                           (editingProduct
-                            ? editingProduct.image || resolveProductImage(editingProduct)
-                            : resolveProductImage({ name: productForm.name, type: productForm.type }))
+                            ? getProductDisplayImage(editingProduct)
+                            : PLACEHOLDER_PRODUCT_IMAGE)
                         }
                         alt="Product preview"
                         onError={(e) => {
-                          e.target.src = sunflowerbouquet;
+                          e.target.src = PLACEHOLDER_PRODUCT_IMAGE;
                         }}
                       />
                       {!productForm.isAvailable && (
@@ -1560,11 +1735,11 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
 
             <div className="delete-product-preview-pill">
               <img
-                src={resolveProductImage(deletingProduct)}
+                src={getProductDisplayImage(deletingProduct)}
                 alt={deletingProduct.name}
                 className="delete-product-preview-thumb"
                 onError={(e) => {
-                  e.target.src = sunflowerbouquet;
+                  e.target.src = PLACEHOLDER_PRODUCT_IMAGE;
                 }}
               />
               <div className="delete-product-preview-info">
