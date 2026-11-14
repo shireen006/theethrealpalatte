@@ -44,6 +44,32 @@ async function run() {
     throw new Error(`Expected announcement bar height ~32px, got ${barStyles.height}px`);
   }
 
+  // Check text sharpness and font weight on .announcement-slide
+  const slideStyles = await desktopPage.locator(".announcement-slide").evaluate((el) => {
+    const s = window.getComputedStyle(el);
+    return {
+      fontWeight: s.fontWeight,
+      fontSize: s.fontSize,
+      fontFamily: s.fontFamily,
+      textShadow: s.textShadow,
+      filter: s.filter,
+      transform: s.transform,
+      willChange: s.willChange,
+    };
+  });
+  console.log("Desktop announcement slide computed styles:", slideStyles);
+
+  if (slideStyles.fontWeight !== "400" && slideStyles.fontWeight !== "normal") {
+    throw new Error(`Expected normal font-weight (400), got ${slideStyles.fontWeight}`);
+  }
+  if (slideStyles.filter !== "none") {
+    throw new Error(`Expected filter: none, got ${slideStyles.filter}`);
+  }
+  if (slideStyles.textShadow !== "none" && slideStyles.textShadow !== "") {
+    throw new Error(`Expected no text-shadow, got ${slideStyles.textShadow}`);
+  }
+  console.log("✓ Text weight is strictly normal (400) with zero blur filters, no text-shadow, and crisp typography.");
+
   // Observe rotation across multiple messages
   const observedMessages = new Set();
   console.log("\nObserving continuous rotation over 10 seconds (should see all 5 messages at 1.8s intervals):");
