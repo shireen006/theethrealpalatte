@@ -570,13 +570,13 @@ export default function App() {
   const [authNotice, setAuthNotice] = useState("");
   const [pendingCartAction, setPendingCartAction] = useState(null);
 
-  // Rotating announcement banner state (rotates every 2.5s)
+  // Rotating announcement banner state (rotates every 1.8s)
   const [announcementIndex, setAnnouncementIndex] = useState(0);
 
   useEffect(() => {
     const timer = setInterval(() => {
       setAnnouncementIndex((prev) => (prev + 1) % ANNOUNCEMENT_MESSAGES.length);
-    }, 2500);
+    }, 1800);
     return () => clearInterval(timer);
   }, []);
 

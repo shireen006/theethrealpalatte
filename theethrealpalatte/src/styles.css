@@ -87,7 +87,7 @@ a {
   color: var(--espresso);
   white-space: nowrap;
   text-align: center;
-  animation: announcementFadeSlide 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: announcementFadeSlide 0.38s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   will-change: transform, opacity;
 }
 

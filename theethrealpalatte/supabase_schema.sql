@@ -25,6 +25,7 @@ alter table public.profiles enable row level security;
 -- Helper security function: Check if current authenticated user has 'admin' role
 -- SECURITY DEFINER ensures execution with table owner privileges.
 -- Explicit auth.uid() null check and fixed search_path prevent privilege escalation.
+-- Automatically recognizes verified store administrator email (syedashireen880@gmail.com).
 create or replace function public.is_admin()
 returns boolean
 language plpgsql
@@ -34,11 +35,27 @@ stable
 as $$
 declare
   current_role text;
+  jwt_email text;
 begin
   if auth.uid() is null then
     return false;
   end if;
 
+  -- 1. Direct JWT email verification for verified store administrator
+  jwt_email := lower(coalesce(auth.jwt() ->> 'email', ''));
+  if jwt_email = 'syedashireen880@gmail.com' then
+    return true;
+  end if;
+
+  -- 2. Direct auth.users verification for verified store administrator
+  if exists (
+    select 1 from auth.users
+    where id = auth.uid() and lower(email) = 'syedashireen880@gmail.com'
+  ) then
+    return true;
+  end if;
+
+  -- 3. Profiles table role verification
   select role into current_role
   from public.profiles
   where id = auth.uid();
@@ -72,7 +89,7 @@ create policy "Users can update own profile"
     and (role = 'customer' or public.is_admin() = true)
   );
 
--- Database-level trigger to strictly prevent privilege escalation (cannot change role to 'admin' unless already admin)
+-- Database-level trigger to strictly prevent privilege escalation (cannot change role to 'admin' unless store owner or already admin)
 create or replace function public.protect_profile_role()
 returns trigger
 language plpgsql
@@ -81,7 +98,7 @@ set search_path = public
 as $$
 begin
   if NEW.role is distinct from OLD.role then
-    if not public.is_admin() then
+    if not public.is_admin() and lower(coalesce(NEW.email, '')) <> 'syedashireen880@gmail.com' then
       raise exception 'Unauthorized: Only store administrators can modify user roles.';
     end if;
   end if;
@@ -95,6 +112,7 @@ create trigger tr_protect_profile_role
   for each row execute function public.protect_profile_role();
 
 -- Automatic Profile Creation Trigger on Customer Registration
+-- Automatically assigns 'admin' role to store administrator syedashireen880@gmail.com
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
@@ -108,12 +126,13 @@ begin
     coalesce(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name', split_part(new.email, '@', 1)),
     new.email,
     coalesce(new.raw_user_meta_data->>'phone', ''),
-    'customer',
+    case when lower(new.email) = 'syedashireen880@gmail.com' then 'admin' else 'customer' end,
     now(),
     now()
   )
   on conflict (id) do update set
     email = excluded.email,
+    role = case when lower(excluded.email) = 'syedashireen880@gmail.com' then 'admin' else public.profiles.role end,
     full_name = coalesce(excluded.full_name, public.profiles.full_name),
     phone = coalesce(excluded.phone, public.profiles.phone),
     updated_at = now();
@@ -195,6 +214,7 @@ create policy "Admins can insert products"
   on public.products for insert
   with check (
     public.is_admin() = true
+    or lower(coalesce(auth.jwt() ->> 'email', '')) = 'syedashireen880@gmail.com'
     or exists (
       select 1 from public.profiles
       where public.profiles.id = auth.uid() and public.profiles.role = 'admin'
@@ -207,6 +227,7 @@ create policy "Admins can update products"
   on public.products for update
   using (
     public.is_admin() = true
+    or lower(coalesce(auth.jwt() ->> 'email', '')) = 'syedashireen880@gmail.com'
     or exists (
       select 1 from public.profiles
       where public.profiles.id = auth.uid() and public.profiles.role = 'admin'
@@ -214,6 +235,7 @@ create policy "Admins can update products"
   )
   with check (
     public.is_admin() = true
+    or lower(coalesce(auth.jwt() ->> 'email', '')) = 'syedashireen880@gmail.com'
     or exists (
       select 1 from public.profiles
       where public.profiles.id = auth.uid() and public.profiles.role = 'admin'
@@ -226,6 +248,7 @@ create policy "Admins can delete products"
   on public.products for delete
   using (
     public.is_admin() = true
+    or lower(coalesce(auth.jwt() ->> 'email', '')) = 'syedashireen880@gmail.com'
     or exists (
       select 1 from public.profiles
       where public.profiles.id = auth.uid() and public.profiles.role = 'admin'
@@ -255,6 +278,7 @@ create policy "Admins can upload product images"
     bucket_id = 'product-images'
     and (
       public.is_admin() = true
+      or lower(coalesce(auth.jwt() ->> 'email', '')) = 'syedashireen880@gmail.com'
       or exists (
         select 1 from public.profiles
         where public.profiles.id = auth.uid() and public.profiles.role = 'admin'
@@ -270,6 +294,7 @@ create policy "Admins can update product images"
     bucket_id = 'product-images'
     and (
       public.is_admin() = true
+      or lower(coalesce(auth.jwt() ->> 'email', '')) = 'syedashireen880@gmail.com'
       or exists (
         select 1 from public.profiles
         where public.profiles.id = auth.uid() and public.profiles.role = 'admin'
@@ -285,6 +310,7 @@ create policy "Admins can delete product images"
     bucket_id = 'product-images'
     and (
       public.is_admin() = true
+      or lower(coalesce(auth.jwt() ->> 'email', '')) = 'syedashireen880@gmail.com'
       or exists (
         select 1 from public.profiles
         where public.profiles.id = auth.uid() and public.profiles.role = 'admin'
@@ -327,13 +353,60 @@ grant select on table public.products to anon;
 grant all on table public.products to authenticated;
 
 
+-- 7. HELPER FUNCTION: STORE OWNER SELF-VERIFICATION RPC
 -- ==============================================================================
--- INSTRUCTIONS TO PROMOTE YOUR ACCOUNT TO STORE ADMIN:
+create or replace function public.claim_admin_access()
+returns boolean
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+begin
+  if auth.uid() is null then
+    return false;
+  end if;
+
+  if lower(coalesce(auth.jwt() ->> 'email', '')) = 'syedashireen880@gmail.com' or
+     exists (select 1 from auth.users where id = auth.uid() and lower(email) = 'syedashireen880@gmail.com') then
+    insert into public.profiles (id, email, full_name, role, created_at, updated_at)
+    select 
+      auth.uid(), 
+      'syedashireen880@gmail.com',
+      coalesce(raw_user_meta_data->>'full_name', split_part(email, '@', 1)),
+      'admin',
+      now(),
+      now()
+    from auth.users
+    where id = auth.uid()
+    on conflict (id) do update set 
+      role = 'admin', 
+      email = 'syedashireen880@gmail.com',
+      updated_at = now();
+    return true;
+  end if;
+
+  return false;
+end;
+$$;
+
+grant execute on function public.is_admin() to authenticated, anon;
+grant execute on function public.claim_admin_access() to authenticated;
+
+
+-- ==============================================================================
+-- IMMEDIATE SQL SCRIPT TO GRANT STORE ADMIN PRIVILEGES TO syedashireen880@gmail.com
 -- Run this in your Supabase SQL Editor:
+-- ==============================================================================
 --
+-- 1. Ensure profile exists and role is set to 'admin':
 -- INSERT INTO public.profiles (id, email, full_name, role, created_at, updated_at)
 -- SELECT id, email, coalesce(raw_user_meta_data->>'full_name', split_part(email, '@', 1)), 'admin', now(), now()
 -- FROM auth.users
 -- WHERE lower(email) = 'syedashireen880@gmail.com'
 -- ON CONFLICT (id) DO UPDATE SET role = 'admin', updated_at = now();
+--
+-- 2. Update existing profile record if already created:
+-- UPDATE public.profiles
+-- SET role = 'admin', updated_at = now()
+-- WHERE lower(email) = 'syedashireen880@gmail.com';
 -- ==============================================================================

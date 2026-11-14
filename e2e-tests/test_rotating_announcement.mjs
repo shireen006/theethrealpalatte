@@ -46,13 +46,13 @@ async function run() {
 
   // Observe rotation across multiple messages
   const observedMessages = new Set();
-  console.log("\nObserving continuous rotation over 13 seconds (should see all 5 messages):");
+  console.log("\nObserving continuous rotation over 10 seconds (should see all 5 messages at 1.8s intervals):");
 
   for (let i = 0; i < 6; i++) {
     const text = (await desktopPage.locator(".announcement-slide").innerText()).trim();
-    console.log(`- Turn ${i + 1} (${i * 2.5}s): "${text}"`);
+    console.log(`- Turn ${i + 1} (${(i * 1.8).toFixed(1)}s): "${text}"`);
     observedMessages.add(text);
-    await desktopPage.waitForTimeout(2550);
+    await desktopPage.waitForTimeout(1850);
   }
 
   console.log(`Observed ${observedMessages.size} distinct messages out of 5 expected.`);
@@ -125,7 +125,7 @@ async function run() {
       console.log("✓ Longest message fits perfectly within 320px with zero clipping.");
       break;
     }
-    await smallPage.waitForTimeout(2550);
+    await smallPage.waitForTimeout(1850);
   }
 
   await smallPage.screenshot({ path: "e2e-tests/verified_small320_rotating_announcement.png" });
@@ -138,3 +138,4 @@ run().catch((err) => {
   console.error("Test failed:", err);
   process.exit(1);
 });
+

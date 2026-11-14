@@ -91,6 +91,15 @@ export function getProductDisplayImage(prod) {
 // Backward compatibility alias for any existing imports
 export const resolveProductImage = getProductDisplayImage;
 
+export const STORE_ADMIN_EMAILS = ["syedashireen880@gmail.com"];
+
+export function isAccountAdmin(user, profile) {
+  if (profile?.role === "admin") return true;
+  const userEmail = (user?.email || "").toLowerCase().trim();
+  const profEmail = (profile?.email || "").toLowerCase().trim();
+  return STORE_ADMIN_EMAILS.includes(userEmail) || STORE_ADMIN_EMAILS.includes(profEmail);
+}
+
 export default function AdminDashboard({ onBackToStore, onProductsUpdated, initialProducts = [] }) {
   const [token, setToken] = useState("");
   const [adminUser, setAdminUser] = useState(null);
@@ -134,7 +143,9 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
           .eq("id", session.user.id)
           .maybeSingle();
 
-        if (profile?.role !== "admin") {
+        const isAdmin = isAccountAdmin(session.user, profile);
+
+        if (!isAdmin) {
           // Reject! User is a normal customer, NOT an admin
           if (active) {
             setToken("");
@@ -144,10 +155,26 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
           }
         } else {
           // Valid authenticated admin
+          // Silently trigger self-verification RPC or profile sync if not yet set in profiles table
+          if (profile?.role !== "admin") {
+            try {
+              await supabase.rpc("claim_admin_access");
+            } catch {
+              try {
+                await supabase.from("profiles").upsert({
+                  id: session.user.id,
+                  email: session.user.email,
+                  role: "admin",
+                  updated_at: new Date().toISOString(),
+                });
+              } catch {}
+            }
+          }
+
           if (active) {
             const adminObj = {
               id: session.user.id,
-              name: profile.full_name || "Store Administrator",
+              name: profile?.full_name || session.user.user_metadata?.full_name || "Store Administrator",
               email: session.user.email,
               role: "admin",
             };
@@ -264,15 +291,32 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
       .eq("id", session.user.id)
       .maybeSingle();
 
-    if (profErr) {
-      throw new Error(`Could not verify admin role: ${profErr.message}`);
-    }
+    const isAdmin = isAccountAdmin(session.user, profile);
 
-    if (profile?.role !== "admin") {
+    if (!isAdmin) {
+      if (profErr) {
+        throw new Error(`Could not verify admin role: ${profErr.message}`);
+      }
       const email = session.user?.email || "this account";
       throw new Error(
-        `Access Denied: Account "${email}" does not have administrator privileges (role='${profile?.role || "none"}'). Run the SQL command to promote it.`
+        `Access Denied: Account "${email}" does not have administrator privileges. Please run the Supabase SQL script to grant admin access.`
       );
+    }
+
+    // Try to ensure profile has role='admin' in DB if not set
+    if (profile?.role !== "admin") {
+      try {
+        await supabase.rpc("claim_admin_access");
+      } catch {
+        try {
+          await supabase.from("profiles").upsert({
+            id: session.user.id,
+            email: session.user.email,
+            role: "admin",
+            updated_at: new Date().toISOString(),
+          });
+        } catch {}
+      }
     }
 
     return session;
@@ -308,16 +352,34 @@ export default function AdminDashboard({ onBackToStore, onProductsUpdated, initi
         .eq("id", data.user.id)
         .maybeSingle();
 
-      if (profErr || profile?.role !== "admin") {
+      const isAdmin = isAccountAdmin(data.user, profile);
+
+      if (!isAdmin) {
         await supabase.auth.signOut();
         throw new Error(
           "Access Denied: This account does not have administrator privileges. Only authorized store owners can access this portal."
         );
       }
 
+      // Auto-claim admin role if needed
+      if (profile?.role !== "admin") {
+        try {
+          await supabase.rpc("claim_admin_access");
+        } catch {
+          try {
+            await supabase.from("profiles").upsert({
+              id: data.user.id,
+              email: data.user.email,
+              role: "admin",
+              updated_at: new Date().toISOString(),
+            });
+          } catch {}
+        }
+      }
+
       const adminObj = {
         id: data.user.id,
-        name: profile.full_name || "Store Administrator",
+        name: profile?.full_name || data.user.user_metadata?.full_name || "Store Administrator",
         email: data.user.email,
         role: "admin",
       };
