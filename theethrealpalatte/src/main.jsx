@@ -33,9 +33,11 @@ import AdminDashboard, { getProductDisplayImage, PLACEHOLDER_PRODUCT_IMAGE } fro
 import { supabase, isSupabaseConfigured } from "./lib/supabase.js";
 
 const ANNOUNCEMENT_MESSAGES = [
-  "Handmade with love",
-  "Made to order",
-  "Customization available",
+  "✦ Handmade with love ✦",
+  "✦ Made to order ✦",
+  "✦ Customization available ✦",
+  "✦ Standard delivery 7–8 days ✦",
+  "✦ Free shipping on orders above ₹999 ✦",
 ];
 
 const slides = [
@@ -568,13 +570,13 @@ export default function App() {
   const [authNotice, setAuthNotice] = useState("");
   const [pendingCartAction, setPendingCartAction] = useState(null);
 
-  // Rotating announcement state for mobile carousel
+  // Rotating announcement banner state (rotates every 2.5s)
   const [announcementIndex, setAnnouncementIndex] = useState(0);
 
   useEffect(() => {
     const timer = setInterval(() => {
       setAnnouncementIndex((prev) => (prev + 1) % ANNOUNCEMENT_MESSAGES.length);
-    }, 3200);
+    }, 2500);
     return () => clearInterval(timer);
   }, []);
 
@@ -1178,27 +1180,12 @@ export default function App() {
       {/* Persistent Mobile Floating Cat (bottom-left corner on all pages) */}
       <HeroCatAnimation isMobile />
 
-      {/* ANNOUNCEMENT BAR */}
-      <aside className="announcement">
-        <div className="announcement-desktop">
-          <span>✦ Handmade with love</span>
-          <span>|</span>
-          <span>Made to order</span>
-          <span>|</span>
-          <span>Customization available</span>
-          <span>|</span>
-          <span>Free shipping on orders above ₹999</span>
-          <span>✦</span>
-        </div>
-        <div className="announcement-mobile" aria-live="polite">
-          <div className="announcement-mobile-rotating">
-            <span key={announcementIndex} className="announcement-slide">
-              {ANNOUNCEMENT_MESSAGES[announcementIndex]}
-            </span>
-          </div>
-          <div className="announcement-mobile-shipping">
-            <span>Free shipping on orders above ₹999</span>
-          </div>
+      {/* ROTATING ANNOUNCEMENT BANNER */}
+      <aside className="announcement" aria-label="Store announcements">
+        <div className="announcement-inner" aria-live="polite">
+          <span key={announcementIndex} className="announcement-slide">
+            {ANNOUNCEMENT_MESSAGES[announcementIndex]}
+          </span>
         </div>
       </aside>
 

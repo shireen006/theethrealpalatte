@@ -48,11 +48,12 @@ a {
 }
 
 /* =========================================================
-   ANNOUNCEMENT BAR (IMAGE 1)
+   ANNOUNCEMENT BAR (ROTATING BANNER)
    ========================================================= */
 .announcement {
+  height: 32px;
   min-height: 32px;
-  padding: 7px 16px;
+  padding: 0 16px;
   background: var(--blush-pale);
   display: flex;
   justify-content: center;
@@ -60,17 +61,51 @@ a {
   font-size: 12px;
   letter-spacing: .03em;
   color: var(--espresso);
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+  box-sizing: border-box;
+  z-index: 40;
 }
 
-.announcement-desktop {
+.announcement-inner {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 11px;
+  width: 100%;
+  height: 100%;
+  text-align: center;
+  overflow: hidden;
 }
 
-.announcement-mobile {
-  display: none;
+.announcement-slide {
+  display: inline-block;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: .035em;
+  color: var(--espresso);
+  white-space: nowrap;
+  text-align: center;
+  animation: announcementFadeSlide 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+@keyframes announcementFadeSlide {
+  0% {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .announcement-slide {
+    animation: none;
+  }
 }
 
 /* =========================================================
@@ -1919,70 +1954,16 @@ a {
 
 @media (max-width: 768px) {
 
-  /* 1. ROTATING ANNOUNCEMENT CAROUSEL */
+  /* 1. ROTATING ANNOUNCEMENT BANNER (MOBILE) */
   .announcement {
-    padding: 6px 12px;
-    min-height: auto;
-    height: auto;
-  }
-
-  .announcement-desktop {
-    display: none;
-  }
-
-  .announcement-mobile {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    gap: 3px;
-    text-align: center;
-  }
-
-  .announcement-mobile-rotating {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 16px;
-    width: 100%;
-    overflow: hidden;
+    height: 32px;
+    min-height: 32px;
+    padding: 0 12px;
   }
 
   .announcement-slide {
-    display: inline-block;
-    font-size: 11px;
-    letter-spacing: 0.04em;
-    font-weight: 500;
-    color: var(--espresso);
-    white-space: nowrap;
-    animation: announcementRotateFade 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  }
-
-  .announcement-mobile-shipping {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    font-size: 10.5px;
-    letter-spacing: 0.03em;
-    font-weight: 500;
-    color: var(--espresso);
-    white-space: nowrap;
-    line-height: 1.2;
-    opacity: 0.95;
-  }
-
-  @keyframes announcementRotateFade {
-    0% {
-      opacity: 0;
-      transform: translateY(6px);
-    }
-
-    100% {
-      opacity: 1;
-      transform: translateY(0);
-    }
+    font-size: 11.5px;
+    letter-spacing: 0.025em;
   }
 
   /* 2. HERO CAT ANIMATION ON MOBILE */
@@ -2238,6 +2219,17 @@ a {
 }
 
 @media (max-width: 480px) {
+  .announcement {
+    height: 32px;
+    min-height: 32px;
+    padding: 0 10px;
+  }
+
+  .announcement-slide {
+    font-size: 11px;
+    letter-spacing: 0.02em;
+  }
+
   .header {
     height: 64px;
     padding: 0 16px;
